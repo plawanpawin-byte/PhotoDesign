@@ -201,6 +201,7 @@ export const TH: Record<string, string> = {
   'Help': 'ช่วยเหลือ',
   'About PhotoDesign': 'เกี่ยวกับ PhotoDesign',
   'PhotoDesign — free and open source photo editor. Engine in Rust, interface in TypeScript.': 'PhotoDesign — โปรแกรมแต่งภาพฟรีและโอเพนซอร์ส engine เขียนด้วย Rust หน้าตาเขียนด้วย TypeScript',
+  'Drag to resize the panels': 'ลากเพื่อปรับความกว้างของแผง',
   'Unsharp mask': 'Unsharp mask',
   Amount: 'ปริมาณ',
   'Apply to layer': 'ใช้กับเลเยอร์',

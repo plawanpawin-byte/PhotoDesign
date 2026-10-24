@@ -18,12 +18,35 @@ const collapsed = new Set<string>();
 
 const BLENDS = ['Normal', 'Dissolve', 'Darken', 'Multiply', 'Color Burn', 'Linear Burn', 'Lighten', 'Screen', 'Color Dodge', 'Linear Dodge (Add)', 'Overlay', 'Soft Light', 'Hard Light', 'Vivid Light', 'Linear Light', 'Pin Light', 'Hard Mix', 'Difference', 'Exclusion', 'Subtract', 'Divide', 'Hue', 'Saturation', 'Color', 'Luminosity'];
 
+/** Width of the dock in pixels, kept across interface rebuilds. */
+let dockWidth = 268;
+
 export function panelDock(app: App): HTMLElement {
-  return h('aside.panel-dock',
+  const grip = h('div.dock-grip', { title: t('Drag to resize the panels') });
+  const dock = h('aside.panel-dock', grip,
     panelGroup(app, 'top', ['color', 'swatches']),
     panelGroup(app, 'middle', ['image', 'adjust', 'history']),
     panelGroup(app, 'bottom', ['layers']),
   );
+  const apply = () => (dock.parentElement as HTMLElement | null)?.style.setProperty('--dock-width', `${dockWidth}px`);
+  grip.addEventListener('pointerdown', (e) => {
+    const startX = e.clientX;
+    const startW = dockWidth;
+    grip.setPointerCapture?.(e.pointerId);
+    const move = (ev: PointerEvent) => {
+      dockWidth = Math.round(Math.min(560, Math.max(220, startW + startX - ev.clientX)));
+      apply();
+    };
+    const up = () => {
+      grip.removeEventListener('pointermove', move);
+      grip.removeEventListener('pointerup', up);
+      window.dispatchEvent(new Event('resize'));
+    };
+    grip.addEventListener('pointermove', move);
+    grip.addEventListener('pointerup', up);
+  });
+  queueMicrotask(apply);
+  return dock;
 }
 
 function panelGroup(app: App, id: string, tabs: readonly Tab[]): HTMLElement {
