@@ -88,10 +88,10 @@ pub(crate) struct ClonePreviewCache {
 }
 
 /// A transient source image beneath the brush outline; never part of the document render.
-fn draw_clone_preview(app: &mut PhotocraftApp, painter: &egui::Painter, xf: &ViewXform, at: [f64; 2], output: Option<u32>) {
+fn draw_clone_preview(app: &mut PhotocraftApp, tool: Tool, painter: &egui::Painter, xf: &ViewXform, at: [f64; 2], output: Option<u32>) {
     use photocraft_engine::presets::clone_source::{Mapping, overlay_blend, transform_matrix};
     let overlay = app.session.presets.clone.overlay.clone();
-    if app.ui.tool != Tool::CloneStamp || !overlay.show || (overlay.auto_hide && app.drag.is_some()) {
+    if tool != Tool::CloneStamp || !overlay.show || (overlay.auto_hide && app.drag.is_some()) {
         return;
     }
     let slot = app.session.presets.clone.active().clone();
@@ -4565,8 +4565,11 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
             ui.ctx().set_cursor_icon(icon);
         } else if let Some(p) = response.hover_pos() {
             let alt = ui.input(|i| i.modifiers.alt);
+            // `tool` is the tool in effect: with Space (Hand), ⌘ (Move) or the middle button held
+            // the Clone Stamp is put down, so its source overlay must not stay under the Hand's
+            // pointer. One tool in hand at a time.
             if !resizing && !alt && !app.ui.shell.sticky_alt {
-                draw_clone_preview(app, &painter, &xf, xf.to_doc(p), output);
+                draw_clone_preview(app, tool, &painter, &xf, xf.to_doc(p), output);
             }
             let icon = match tool {
                 // Resizing the brush: the circle stays where the drag began (`brush_resize`).
@@ -7811,6 +7814,29 @@ mod tests {
     }
 
     #[test]
+    fn clone_overlay_is_put_down_with_the_clone_stamp() {
+        // Space (Hand), ⌘ (Move) or the middle button replace the tool in effect; the selected
+        // Clone Stamp must not leave its source overlay under their pointer.
+        let ctx = egui::Context::default();
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+        app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
+        app.run("cloneSource.set", json!({"source": [16,16]})).unwrap();
+        app.ui.tool = Tool::CloneStamp;
+        app.session.tools.brush.size = 20.0;
+        let xf =
+            ViewXform { rect: Rect::from_min_size(Pos2::ZERO, vec2(100.0, 100.0)), zoom: 1.0, center: [32.0, 32.0], flip: false, rotation: 0.0, aspect: 1.0 };
+        for (tool, shown) in [(Tool::CloneStamp, true), (Tool::Hand, false), (Tool::Move, false), (Tool::Zoom, false)] {
+            let mut output = ctx.run_ui(Default::default(), |ui| {
+                let painter = ui.ctx().layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("clone-tool-test")));
+                draw_clone_preview(&mut app, tool, &painter, &xf, [32.0, 32.0], None);
+            });
+            output.textures_delta.clear();
+            let meshes = output.shapes.iter().filter(|s| matches!(s.shape, egui::Shape::Mesh(_))).count();
+            assert_eq!(meshes > 0, shown, "{tool:?}: overlay shown = {shown}");
+        }
+    }
+
+    #[test]
     fn clone_overlay_is_circular_and_respects_visibility() {
         let ctx = egui::Context::default();
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
@@ -7824,7 +7850,7 @@ mod tests {
         let mut output = ctx.run_ui(Default::default(), |ui| {
             let ctx = ui.ctx();
             let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("clone-test")));
-            draw_clone_preview(&mut app, &painter, &xf, [32.0, 32.0], None);
+            draw_clone_preview(&mut app, Tool::CloneStamp, &painter, &xf, [32.0, 32.0], None);
         });
         output.textures_delta.clear();
         let mesh = output
@@ -7844,7 +7870,7 @@ mod tests {
         app.ui.view.pattern_preview = true;
         let mut periodic_output = ctx.run_ui(Default::default(), |ui| {
             let painter = ui.ctx().layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("clone-test")));
-            draw_clone_preview(&mut app, &painter, &xf, [32.0, 32.0], None);
+            draw_clone_preview(&mut app, Tool::CloneStamp, &painter, &xf, [32.0, 32.0], None);
         });
         assert_ne!(app.clone_preview.as_ref().unwrap().key, ordinary_key, "toggling Pattern Preview invalidates source pixels");
         assert!(!periodic_output.textures_delta.set.is_empty(), "the overlay texture is refreshed without a document edit");
@@ -7854,7 +7880,7 @@ mod tests {
         let mut output = ctx.run_ui(Default::default(), |ui| {
             let ctx = ui.ctx();
             let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("clone-test")));
-            draw_clone_preview(&mut app, &painter, &xf, [32.0, 32.0], None);
+            draw_clone_preview(&mut app, Tool::CloneStamp, &painter, &xf, [32.0, 32.0], None);
         });
         output.textures_delta.clear();
         assert!(output.shapes.iter().all(|s| !matches!(s.shape, egui::Shape::Mesh(_))));
@@ -7873,7 +7899,7 @@ mod tests {
         for invert in [false, true] {
             app.session.presets.clone.overlay.invert = invert;
             let mut output = ctx.run_ui(Default::default(), |ui| {
-                draw_clone_preview(&mut app, ui.painter(), &xf, [32.0, 32.0], None);
+                draw_clone_preview(&mut app, Tool::CloneStamp, ui.painter(), &xf, [32.0, 32.0], None);
             });
             let upload = output.textures_delta.set.values().flatten().find(|d| d.image.size() == [20, 20]).expect("clone overlay upload");
             let options = upload.options;
@@ -7898,7 +7924,7 @@ mod tests {
             app.run("cloneSource.overlay", json!({"blend": mode})).unwrap();
             let mut output = ctx.run_ui(Default::default(), |ui| {
                 let painter = ui.ctx().layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("clone-test")));
-                draw_clone_preview(&mut app, &painter, &xf, [32.0, 32.0], None);
+                draw_clone_preview(&mut app, Tool::CloneStamp, &painter, &xf, [32.0, 32.0], None);
             });
             // The brush's 20 × 20 px square (the font atlas may upload too).
             let image = output.textures_delta.set.values().flatten().find_map(|d| match &d.image {
@@ -7929,7 +7955,7 @@ mod tests {
             ViewXform { rect: Rect::from_min_size(Pos2::ZERO, vec2(100.0, 100.0)), zoom: 1.0, center: [32.0, 32.0], flip: false, rotation: 0.0, aspect: 1.0 };
         let mut output = ctx.run_ui(Default::default(), |ui| {
             let painter = ui.ctx().layer_painter(egui::LayerId::new(egui::Order::Foreground, egui::Id::new("clone-test")));
-            draw_clone_preview(&mut app, &painter, &xf, [32.0, 32.0], None);
+            draw_clone_preview(&mut app, Tool::CloneStamp, &painter, &xf, [32.0, 32.0], None);
         });
         let image = output
             .textures_delta
