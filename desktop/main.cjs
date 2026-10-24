@@ -5,7 +5,8 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 
-const dist = path.resolve(process.env.PHOTODESIGN_WEB_DIST || path.join(__dirname, '..', 'web', 'dist'));
+// Installed builds carry the interface in resources/web; from source it is web/dist.
+const dist = path.resolve(process.env.PHOTODESIGN_WEB_DIST || (app.isPackaged ? path.join(process.resourcesPath, 'web') : path.join(__dirname, '..', 'web', 'dist')));
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',

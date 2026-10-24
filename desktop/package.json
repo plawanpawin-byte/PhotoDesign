@@ -1,14 +1,63 @@
 {
   "name": "photodesign-desktop",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "PhotoDesign desktop window (Electron) for the TypeScript interface in web/.",
   "main": "main.cjs",
   "scripts": {
     "start": "node run.mjs",
-    "electron": "electron ."
+    "electron": "electron .",
+    "dist": "node dist.mjs"
   },
   "devDependencies": {
-    "electron": "^33.0.0"
-  }
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "author": "PhotoDesign",
+  "build": {
+    "appId": "app.photodesign.desktop",
+    "productName": "PhotoDesign",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.cjs",
+      "icon.png",
+      "icon.ico"
+    ],
+    "extraResources": [
+      {
+        "from": "../web/dist",
+        "to": "web"
+      }
+    ],
+    "win": {
+      "icon": "icon.ico",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "PhotoDesign-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "PhotoDesign-Portable-${version}.${ext}"
+    },
+    "linux": {
+      "icon": "icon.png",
+      "target": [
+        "AppImage"
+      ],
+      "category": "Graphics"
+    },
+    "mac": {
+      "icon": "icon.png",
+      "category": "public.app-category.graphics-design"
+    },
+    "publish": null
+  },
+  "repository": "https://github.com/plawanpawin-byte/PhotoDesign"
 }

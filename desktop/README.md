@@ -20,3 +20,17 @@ npm start
 
 `PHOTODESIGN_WEB_DIST=<folder>` points the window at another build. The page is served on
 127.0.0.1 only, on a random port, while the window is open.
+
+## Installer (.exe)
+
+```
+cd desktop
+npm run dist
+```
+
+Builds the engine with full optimisation, the interface, then `release/PhotoDesign-Setup-<version>.exe`
+(installer) and `release/PhotoDesign-Portable-<version>.exe` (runs without installing). The
+installed app needs neither Rust nor Node.
+
+GitHub builds the same two files on every push (workflow "Desktop app"); download them from the
+run's artifacts. Pushing a `v*` tag also attaches them to a release.
