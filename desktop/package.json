@@ -5,7 +5,8 @@
   "description": "PhotoDesign desktop window (Electron) for the TypeScript interface in web/.",
   "main": "main.cjs",
   "scripts": {
-    "start": "electron ."
+    "start": "node run.mjs",
+    "electron": "electron ."
   },
   "devDependencies": {
     "electron": "^33.0.0"
