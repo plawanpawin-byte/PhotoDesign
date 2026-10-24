@@ -846,7 +846,9 @@ impl PhotocraftMcp {
 
     #[tool(description = "Run an engine command by id with JSON params (see command_list). Returns the command's JSON result. \
         Long commands (filters, Content-Aware Fill/Scale, Photomerge, brush import) wait to finish unless `wait` is false: \
-        then they run as a background job and the result is {job: id} (see jobs_list, jobs_cancel).")]
+        then they run as a background job and the result is {job: id} (see jobs_list, jobs_cancel). In the desktop app the \
+        engine runs on the window's one thread: a job starts about a quarter of a second later and runs one at a time, so jobs_cancel stops \
+        a job that has not started yet, but cannot interrupt one that is running.")]
     async fn command_run(&self, Parameters(p): Parameters<RunParams>) -> Result<CallToolResult, McpError> {
         self.run_command(p.id, p.params.unwrap_or_else(|| json!({})), p.wait.unwrap_or(true)).await
     }
@@ -955,7 +957,7 @@ impl PhotocraftMcp {
     }
 
     #[tool(
-        description = "Bridge mode: change UI state (tool, panels, dock, zoom, center, fit, theme, brush settings; see `fields`). Unknown fields are an error."
+        description = "Bridge mode: change UI state. Fields: `tool` (tool id, e.g. brush, pen), `zoom` (1 = 100%), `fit` (true fits the view), `center` ([x, y] in document pixels), `brushSize` (pixels, 1..5000), `brushHardness`, `brushOpacity` and `brushFlow` (percent, 0..100, as the options bar shows them), `selectionMode` (replace, add, subtract, intersect, or 0..3). Unknown fields are an error."
     )]
     async fn ui_set(&self, Parameters(p): Parameters<UiSetParams>) -> Result<CallToolResult, McpError> {
         match self.bridge_client() {

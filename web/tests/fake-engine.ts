@@ -60,8 +60,23 @@ export class FakeEngine implements EngineApi {
         return {};
     }
   }
-  open(name: string): unknown {
+  open(name: string, _bytes?: Uint8Array, path?: string): unknown {
+    if (path) this.paths.set(name, path);
     return this.execute('file.new', { name, width: 10, height: 10 });
+  }
+  paths = new Map<string, string>();
+  writeBackPath(): string {
+    const path = this.doc ? this.paths.get(this.doc.name) : undefined;
+    if (!path) throw new Error('document has no path; pass `path`');
+    return path;
+  }
+  exportFiles(kind: 'layers' | 'dataSets', params: Record<string, unknown> = {}) {
+    this.calls.push([`exportFiles.${kind}`, params]);
+    return [{ name: 'a-01.png', bytes: new Uint8Array([1, 2]) }, { name: 'a-02.png', bytes: new Uint8Array([3]) }];
+  }
+  importDataSets(text: string, params: Record<string, unknown> = {}): unknown {
+    this.calls.push(['importDataSets', { text, ...params }]);
+    return { imported: 2 };
   }
   place(name: string, _bytes: Uint8Array, params: Record<string, unknown> = {}): unknown {
     this.calls.push(['file.placeEmbedded', { name, ...params }]);
@@ -69,7 +84,7 @@ export class FakeEngine implements EngineApi {
   }
   state(): EngineState {
     return {
-      session: { active: this.doc ? 0 : null, documents: this.doc ? [{ index: 0, name: this.doc.name, width: this.doc.width, height: this.doc.height, dirty: false, revision: this.rev }] : [], foreground: this.fg, background: this.bg },
+      session: { active: this.doc ? 0 : null, documents: this.doc ? [{ index: 0, name: this.doc.name, width: this.doc.width, height: this.doc.height, dirty: false, revision: this.rev, path: this.paths.get(this.doc.name) ?? null }] : [], foreground: this.fg, background: this.bg },
       document: this.doc ? structuredClone(this.doc) : null,
     };
   }

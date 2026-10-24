@@ -38,7 +38,7 @@ export interface DocumentInfo {
 
 export interface SessionInfo {
   active: number | null;
-  documents: { index: number; name: string; width: number; height: number; dirty: boolean; revision: number }[];
+  documents: { index: number; name: string; width: number; height: number; dirty: boolean; revision: number; path?: string | null }[];
   /** Linear-ish 0..1 RGBA as the engine stores toolbox colours. */
   foreground: number[];
   background: number[];
@@ -60,6 +60,12 @@ export interface CommandInfo {
   needsDocument?: boolean;
 }
 
+/** One file an export command makes: a single-component name and its bytes. */
+export interface ExportedFile {
+  name: string;
+  bytes: Uint8Array;
+}
+
 export interface Frame {
   width: number;
   height: number;
@@ -69,7 +75,14 @@ export interface Frame {
 /** What the UI needs from the engine. The wasm engine implements it; tests use a fake. */
 export interface EngineApi {
   execute(id: string, params?: Record<string, unknown>): unknown;
-  open(name: string, bytes: Uint8Array): unknown;
+  /** `path` is where the bytes came from: saving without a path writes back to it. */
+  open(name: string, bytes: Uint8Array, path?: string): unknown;
+  /** The files Layers to Files (`layers`) or Export Data Sets (`dataSets`) would write, as bytes: the web has no file system. */
+  exportFiles(kind: 'layers' | 'dataSets', params?: Record<string, unknown>): ExportedFile[];
+  /** The file a save without a path writes back to; throws, saying why, when the document has none that can hold it. */
+  writeBackPath(): string;
+  /** Imports the CSV text of a data set file (Import Variable Data Sets). */
+  importDataSets(text: string, params?: Record<string, unknown>): unknown;
   place(name: string, bytes: Uint8Array, params?: Record<string, unknown>): unknown;
   state(): EngineState;
   commands(): CommandInfo[];

@@ -78,7 +78,8 @@ function startControl({ port, root, window, call }) {
       case 'app.open': {
         const file = inside(root, params.path, 'app.open');
         const bytes = fs.readFileSync(file);
-        const result = await call('app.openBytes', { name: path.basename(file), base64: bytes.toString('base64') });
+        // The path is kept with the document, so a save without one writes back to this file.
+        const result = await call('app.openBytes', { name: path.basename(file), base64: bytes.toString('base64'), path: file });
         return { ...(result && typeof result === 'object' ? result : {}), path: file, name: path.basename(file), warnings: [] };
       }
       case 'engine.execute': {
@@ -89,10 +90,25 @@ function startControl({ port, root, window, call }) {
           const result = await call('app.placeBytes', { ...options, name: path.basename(file), base64: fs.readFileSync(file).toString('base64') });
           return { ...(result && typeof result === 'object' ? result : {}), path: file };
         }
+        if (params.command === 'file.export.layersToFiles' || params.command === 'file.export.dataSetsAsFiles') {
+          return exportFiles(params.command === 'file.export.layersToFiles' ? 'layers' : 'dataSets', params.params ?? {});
+        }
+        if (params.command === 'file.import.variableDataSets' && params.params && typeof params.params.path === 'string') {
+          const { path: rel, ...options } = params.params;
+          const text = fs.readFileSync(inside(root, rel, 'doc_import_data_sets'), 'utf8');
+          return call('app.importDataSets', { ...options, text });
+        }
         return call(method, params);
       }
       case 'app.save': {
-        const file = inside(root, params.path, 'app.save');
+        // Without a path, the document's own file (kept by app.open) when it is a layered format that holds everything.
+        let file;
+        if (params.path === undefined) {
+          file = path.resolve((await call('app.writeBackPath', {})).path);
+          if (!file.startsWith(root + path.sep)) throw new Error(`app.save: ${file} is outside the automation folder ${root}; pass \`path\``);
+        } else {
+          file = inside(root, params.path, 'app.save');
+        }
         const format = path.extname(file).slice(1).toLowerCase() || 'png';
         const { base64 } = await call('app.exportBytes', { format, quality: params.quality });
         fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -102,6 +118,23 @@ function startControl({ port, root, window, call }) {
       default:
         return call(method, params);
     }
+  }
+
+  // The web build has no file system, so the page encodes each file and this writes them: all
+  // names are checked first, and a file that already exists is an error, never an overwrite.
+  async function exportFiles(kind, options) {
+    const { dir: rel, output, ...rest } = options;
+    const dir = inside(root, rel ?? output, 'doc_export');
+    const { files } = await call('app.exportFiles', { ...rest, kind });
+    const targets = files.map((f) => {
+      if (!f.name || f.name !== path.basename(f.name) || f.name === '..' || /[\\/]/.test(f.name)) throw new Error(`export: refused file name \`${f.name}\``);
+      return path.join(dir, f.name);
+    });
+    const clash = targets.find((t) => fs.existsSync(t));
+    if (clash) throw new Error(`export: ${clash} already exists; nothing was written`);
+    fs.mkdirSync(dir, { recursive: true });
+    files.forEach((f, i) => fs.writeFileSync(targets[i], Buffer.from(f.base64, 'base64'), { flag: 'wx' }));
+    return { files: targets };
   }
 
   function withDeadline(promise) {

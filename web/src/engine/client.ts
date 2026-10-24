@@ -1,5 +1,5 @@
 import { useNative } from '../lib/native';
-import type { CommandInfo, EngineApi, EngineState, Frame } from './types';
+import type { CommandInfo, EngineApi, EngineState, ExportedFile, Frame } from './types';
 
 /** The free functions the wasm package exports next to the engine class. */
 export interface RawImaging {
@@ -10,13 +10,32 @@ export interface RawImaging {
 /** The generated wasm-bindgen class, as far as the client uses it. */
 interface RawEngine {
   execute(id: string, params: string): string;
-  open(name: string, bytes: Uint8Array): string;
+  open(name: string, bytes: Uint8Array, path?: string): string;
+  export_files(kind: string, params: string): Uint8Array;
+  import_data_sets(text: string, params: string): string;
+  write_back_path(): string;
   place(name: string, bytes: Uint8Array, params: string): string;
   state(): string;
   commands(): string;
   revision(): number;
   render(maxSide: number): { width: number; height: number; pixels(): Uint8Array; free(): void };
   export(nameOrExt: string): Uint8Array;
+}
+
+/** The engine's packed files (`u32 count`, then per file `u32 name length, name, u32 data length, data`, little-endian). */
+export function unpackFiles(bytes: Uint8Array): ExportedFile[] {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const files: ExportedFile[] = [];
+  let at = 4;
+  for (let i = view.getUint32(0, true); i > 0; i--) {
+    const nameLength = view.getUint32(at, true);
+    const name = new TextDecoder().decode(bytes.subarray(at + 4, at + 4 + nameLength));
+    at += 4 + nameLength;
+    const length = view.getUint32(at, true);
+    files.push({ name, bytes: bytes.slice(at + 4, at + 4 + length) });
+    at += 4 + length;
+  }
+  return files;
 }
 
 /** An engine error, with the command that raised it. */
@@ -49,9 +68,9 @@ export class EngineClient implements EngineApi {
     }
   }
 
-  open(name: string, bytes: Uint8Array): unknown {
+  open(name: string, bytes: Uint8Array, path?: string): unknown {
     try {
-      return JSON.parse(this.raw.open(name, bytes));
+      return JSON.parse(this.raw.open(name, bytes, path));
     } catch (e) {
       throw new EngineError('open', message(e));
     }
@@ -62,6 +81,30 @@ export class EngineClient implements EngineApi {
       return JSON.parse(this.raw.place(name, bytes, JSON.stringify(params)));
     } catch (e) {
       throw new EngineError('place', message(e));
+    }
+  }
+
+  exportFiles(kind: 'layers' | 'dataSets', params: Record<string, unknown> = {}): ExportedFile[] {
+    try {
+      return unpackFiles(this.raw.export_files(kind, JSON.stringify(params)));
+    } catch (e) {
+      throw new EngineError('exportFiles', message(e));
+    }
+  }
+
+  writeBackPath(): string {
+    try {
+      return this.raw.write_back_path();
+    } catch (e) {
+      throw new EngineError('save', message(e));
+    }
+  }
+
+  importDataSets(text: string, params: Record<string, unknown> = {}): unknown {
+    try {
+      return JSON.parse(this.raw.import_data_sets(text, JSON.stringify(params)));
+    } catch (e) {
+      throw new EngineError('importDataSets', message(e));
     }
   }
 

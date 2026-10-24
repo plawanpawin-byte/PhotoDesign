@@ -23,6 +23,19 @@ pub struct Frame {
     pub pixels: Vec<u8>,
 }
 
+/// `files` as `u32 count`, then per file `u32 name length, name, u32 data length, data` (little-endian).
+fn pack_files(files: &[(String, Vec<u8>)]) -> Vec<u8> {
+    let mut out = Vec::new();
+    out.extend_from_slice(&(files.len() as u32).to_le_bytes());
+    for (name, data) in files {
+        out.extend_from_slice(&(name.len() as u32).to_le_bytes());
+        out.extend_from_slice(name.as_bytes());
+        out.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        out.extend_from_slice(data);
+    }
+    out
+}
+
 /// One editing session: the open documents and the toolbox state.
 #[derive(Default)]
 pub struct Studio {
@@ -43,9 +56,50 @@ impl Studio {
         self.session.execute(id, params).map_err(|e| e.to_string())
     }
 
-    /// Opens a file's bytes as a new document; `name` picks the format by its extension.
-    pub fn open(&mut self, name: &str, bytes: &[u8]) -> Result<Value, String> {
-        file_cmds::open_bytes_as(&mut self.session, name, bytes, None, None).map_err(|e| e.to_string())
+    /// Opens a file's bytes as a new document; `name` picks the format by its extension. `path` is
+    /// where the bytes came from, kept so that saving without a path writes back to it.
+    pub fn open(&mut self, name: &str, bytes: &[u8], path: Option<String>) -> Result<Value, String> {
+        file_cmds::open_bytes_as(&mut self.session, name, bytes, None, path).map_err(|e| e.to_string())
+    }
+
+    /// The files a file-writing export command would make, as bytes instead of paths (the web has no
+    /// file system; the host writes them). `kind` is `layers` (Layers to Files) or `dataSets`
+    /// (Export Data Sets); `params` are the command's own. Packed as `u32 count`, then per file
+    /// `u32 name length, name, u32 data length, data`, all little-endian.
+    pub fn export_files(&self, kind: &str, params: &Value) -> Result<Vec<u8>, String> {
+        let mut files: Vec<(String, Vec<u8>)> = Vec::new();
+        let mut keep = |name: &str, bytes: &[u8]| {
+            files.push((name.to_string(), bytes.to_vec()));
+            Ok(())
+        };
+        match kind {
+            "layers" => file_cmds::export_layers_with(&self.session, params, &mut keep),
+            "dataSets" => photocraft_engine::export_data_sets_with(&self.session, params, &mut keep),
+            other => return Err(format!("export_files: unknown kind `{other}` (layers or dataSets)")),
+        }
+        .map_err(|e| e.to_string())?;
+        Ok(pack_files(&files))
+    }
+
+    /// The file the active document may be saved back to when no path is given: its own, and only
+    /// when that is a layered format (PSD, PSB, OpenRaster, .pcraft) that holds the whole document,
+    /// so a flat copy never replaces the original. The error says why not and what to do.
+    pub fn write_back_path(&self) -> Result<String, String> {
+        let d = self.session.active().ok_or("no open document")?;
+        let Some(path) = d.path.as_deref() else {
+            return Err("document has no path; pass `path`".into());
+        };
+        if !file_cmds::holds_at(&d.doc, path) {
+            let lost = file_cmds::losses_at(&d.doc, path);
+            let why = if lost.is_empty() { String::new() } else { format!(" (it can't keep: {})", lost.join("; ")) };
+            return Err(format!("pass `path`: without one, only a PSD, PSB, .pcraft or OpenRaster file that holds the whole document is written back, in its own format, so `{path}` was left unchanged{why}"));
+        }
+        Ok(path.to_string())
+    }
+
+    /// Imports a data set CSV whose text the host already read (`file.import.variableDataSets`).
+    pub fn import_data_sets(&mut self, text: &str, params: &Value) -> Result<Value, String> {
+        photocraft_engine::import_data_sets_text(&mut self.session, text, params).map_err(|e| e.to_string())
     }
 
     /// Places a file's bytes as a Smart Object layer in the active document; `params` carries the
@@ -89,6 +143,10 @@ impl Studio {
 #[cfg(target_arch = "wasm32")]
 pub mod web {
     use wasm_bindgen::prelude::*;
+
+    fn object_params(what: &str, params: &str) -> Result<serde_json::Value, JsError> {
+        if params.trim().is_empty() { Ok(serde_json::json!({})) } else { serde_json::from_str(params).map_err(|e| fail(format!("{what}: the parameters are not JSON: {e}"))) }
+    }
 
     fn fail(message: String) -> JsError {
         JsError::new(&message)
@@ -138,8 +196,19 @@ pub mod web {
         pub fn execute(&mut self, id: &str, params: &str) -> Result<String, JsError> {
             self.studio.execute(id, params).map(|v| v.to_string()).map_err(fail)
         }
-        pub fn open(&mut self, name: &str, bytes: &[u8]) -> Result<String, JsError> {
-            self.studio.open(name, bytes).map(|v| v.to_string()).map_err(fail)
+        pub fn open(&mut self, name: &str, bytes: &[u8], path: Option<String>) -> Result<String, JsError> {
+            self.studio.open(name, bytes, path).map(|v| v.to_string()).map_err(fail)
+        }
+        pub fn export_files(&self, kind: &str, params: &str) -> Result<Vec<u8>, JsError> {
+            let params = object_params("exportFiles", params)?;
+            self.studio.export_files(kind, &params).map_err(fail)
+        }
+        pub fn write_back_path(&self) -> Result<String, JsError> {
+            self.studio.write_back_path().map_err(fail)
+        }
+        pub fn import_data_sets(&mut self, text: &str, params: &str) -> Result<String, JsError> {
+            let params = object_params("importDataSets", params)?;
+            self.studio.import_data_sets(text, &params).map(|v| v.to_string()).map_err(fail)
         }
         pub fn place(&mut self, name: &str, bytes: &[u8], params: &str) -> Result<String, JsError> {
             let params: serde_json::Value = if params.trim().is_empty() { serde_json::json!({}) } else { serde_json::from_str(params).map_err(|e| fail(format!("place: the parameters are not JSON: {e}")))? };
@@ -279,7 +348,7 @@ mod tests {
         let mut s = studio_with_canvas(8, 6);
         let png = s.export("png").unwrap();
         assert_eq!(&png[..4], b"\x89PNG");
-        s.open("again.png", &png).unwrap();
+        s.open("again.png", &png, None).unwrap();
         assert_eq!(s.state()["session"]["documents"].as_array().unwrap().len(), 2);
         assert_eq!(s.state()["document"]["width"], 8);
     }
@@ -297,6 +366,63 @@ mod tests {
     }
 
     #[test]
+    fn open_keeps_the_path_it_came_from() {
+        let mut s = studio_with_canvas(4, 4);
+        let png = s.export("png").unwrap();
+        s.open("again.png", &png, Some("C:/Docs/again.png".into())).unwrap();
+        let state = s.state();
+        assert_eq!(state["session"]["documents"][1]["path"], "C:/Docs/again.png");
+        assert!(state["session"]["documents"][0]["path"].is_null());
+    }
+
+    /// The packed files, back as (name, length).
+    fn unpack(bytes: &[u8]) -> Vec<(String, usize)> {
+        let u32_at = |at: usize| u32::from_le_bytes(bytes[at..at + 4].try_into().unwrap()) as usize;
+        let (mut at, mut out) = (4, Vec::new());
+        for _ in 0..u32_at(0) {
+            let n = u32_at(at);
+            let name = String::from_utf8(bytes[at + 4..at + 4 + n].to_vec()).unwrap();
+            at += 4 + n;
+            let len = u32_at(at);
+            at += 4 + len;
+            out.push((name, len));
+        }
+        assert_eq!(at, bytes.len(), "no trailing bytes");
+        out
+    }
+
+    #[test]
+    fn layers_export_as_bytes_without_a_file_system() {
+        let mut s = studio_with_canvas(8, 8);
+        s.execute("layer.duplicate", "{}").unwrap();
+        let files = unpack(&s.export_files("layers", &json!({"format": "png", "prefix": "p"})).unwrap());
+        assert_eq!(files.len(), 2, "background and its copy: {files:?}");
+        assert!(files.iter().all(|(n, len)| n.starts_with("p") && n.ends_with(".png") && *len > 8), "{files:?}");
+        assert!(s.export_files("nope", &json!({})).is_err());
+        assert!(Studio::new().export_files("layers", &json!({})).is_err(), "no document");
+    }
+
+    #[test]
+    fn data_set_files_need_a_document_and_data_sets() {
+        let mut s = studio_with_canvas(8, 8);
+        let err = s.export_files("dataSets", &json!({})).unwrap_err();
+        assert!(err.contains("no data sets"), "{err}");
+        assert!(Studio::new().import_data_sets("title\nA\n", &json!({})).is_err(), "no document");
+    }
+
+    #[test]
+    fn saving_without_a_path_writes_back_only_to_a_layered_file() {
+        let mut s = studio_with_canvas(4, 4);
+        assert!(s.write_back_path().unwrap_err().contains("no path"));
+        let psd = s.export("psd").unwrap();
+        s.open("a.psd", &psd, Some("C:/Docs/a.psd".into())).unwrap();
+        assert_eq!(s.write_back_path().unwrap(), "C:/Docs/a.psd");
+        let png = s.export("png").unwrap();
+        s.open("a.png", &png, Some("C:/Docs/a.png".into())).unwrap();
+        assert!(s.write_back_path().unwrap_err().contains("left unchanged"));
+    }
+
+    #[test]
     fn bad_input_is_an_error_not_a_crash() {
         let mut s = Studio::new();
         assert!(s.render(100).is_err());
@@ -305,7 +431,7 @@ mod tests {
         assert!(s.execute("file.new", "not json").is_err());
         assert!(s.execute("file.new", "[1,2]").is_err());
         assert!(s.execute("file.new", r#"{"width":-5}"#).is_err());
-        assert!(s.open("broken.png", b"definitely not a png").is_err());
+        assert!(s.open("broken.png", b"definitely not a png", None).is_err());
         assert!(s.revision().is_none());
         let mut s = studio_with_canvas(4, 4);
         assert!(s.render(0).is_ok(), "a zero side is clamped");

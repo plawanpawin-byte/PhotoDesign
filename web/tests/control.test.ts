@@ -53,6 +53,55 @@ describe('control channel (AI agents)', () => {
     expect(engine.calls.at(-1)).toEqual(['file.placeEmbedded', { name: 'logo.png', scale: 50 }]);
   });
 
+  it('exports files and imports data sets through the host, which has the file system', async () => {
+    const { app, engine } = setup();
+    await expect(call(app, 'app.exportFiles', { kind: 'layers' })).rejects.toThrow(/no document/);
+    await call(app, 'engine.execute', { command: 'file.new', params: { width: 50, height: 50, name: 'doc' } });
+    const out = (await call(app, 'app.exportFiles', { kind: 'layers', format: 'png' })) as { files: { name: string; base64: string }[] };
+    expect(out.files.map((f) => f.name)).toEqual(['a-01.png', 'a-02.png']);
+    expect(out.files[0]!.base64).toBe('AQI=');
+    expect(engine.calls.at(-1)).toEqual(['exportFiles.layers', { format: 'png' }]);
+    await call(app, 'app.exportFiles', { kind: 'dataSets' });
+    expect(engine.calls.at(-1)?.[0]).toBe('exportFiles.dataSets');
+    await call(app, 'app.importDataSets', { text: 'a\n1', delimiter: ';' });
+    expect(engine.calls.at(-1)).toEqual(['importDataSets', { text: 'a\n1', delimiter: ';' }]);
+  });
+
+  it('keeps the path a document was opened from, so a save without a path can write back', async () => {
+    const { app } = setup();
+    await call(app, 'app.openBytes', { name: 'a.psd', base64: 'AAAA' });
+    await expect(call(app, 'app.writeBackPath')).rejects.toThrow(/no path/);
+    await call(app, 'app.openBytes', { name: 'b.psd', base64: 'AAAA', path: 'C:/Docs/b.psd' });
+    expect(await call(app, 'app.writeBackPath')).toEqual({ path: 'C:/Docs/b.psd' });
+  });
+
+  it('runs wait:false commands as background jobs that jobs.cancel can stop before they start', async () => {
+    const { app, engine } = setup();
+    await call(app, 'engine.execute', { command: 'file.new', params: { width: 50, height: 50 } });
+    const before = engine.calls.length;
+    const started = (await call(app, 'engine.execute', { command: 'image.adjustments.invert', params: {}, wait: false })) as { job: number; pending: boolean };
+    expect(started.pending).toBe(true);
+    expect(engine.calls.length).toBe(before); // not run yet: the caller got the job id first
+    expect(((await call(app, 'jobs.list')) as { jobs: { id: number; state: string }[] }).jobs).toContainEqual(expect.objectContaining({ id: started.job, state: 'running' }));
+    await new Promise((r) => setTimeout(r, 450));
+    expect(engine.calls.length).toBe(before + 1);
+    expect(((await call(app, 'jobs.list')) as { jobs: { id: number; state: string }[] }).jobs.find((j) => j.id === started.job)?.state).toBe('done');
+
+    const second = (await call(app, 'engine.execute', { command: 'image.adjustments.invert', wait: false })) as { job: number };
+    expect(await call(app, 'jobs.cancel', { job: second.job })).toEqual({ cancelled: 1 });
+    await new Promise((r) => setTimeout(r, 450));
+    expect(engine.calls.length).toBe(before + 1); // the cancelled job never ran
+    expect(await call(app, 'jobs.cancel', { job: started.job })).toEqual({ cancelled: 0 }); // already finished
+    await expect(call(app, 'jobs.cancel', { job: 999 })).rejects.toThrow(/no job/);
+
+    engine.failNext = 'boom';
+    const bad = (await call(app, 'engine.execute', { command: 'image.adjustments.invert', wait: false })) as { job: number };
+    await new Promise((r) => setTimeout(r, 450));
+    const listed = ((await call(app, 'jobs.list')) as { jobs: { id: number; state: string; error?: string }[] }).jobs.find((j) => j.id === bad.job);
+    expect(listed?.state).toBe('failed');
+    expect(listed?.error).toBe('boom');
+  });
+
   it('plays pointer events through the active tool', async () => {
     const { app, engine } = setup();
     await call(app, 'engine.execute', { command: 'file.new', params: { width: 100, height: 100 } });

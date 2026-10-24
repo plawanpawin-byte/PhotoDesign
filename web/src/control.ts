@@ -152,6 +152,73 @@ async function pointer(app: App, p: Record<string, any>) {
   return { tool: app.tools.active, changed: app.engine.revision() !== before, document: app.state.document };
 }
 
+function runCommand(app: App, id: string, params: Record<string, unknown>): unknown {
+  const result = app.engine.execute(id, params);
+  app.preview = null;
+  app.refresh();
+  return result ?? null;
+}
+
+/**
+ * Background jobs (`engine.execute` with `wait: false`). The wasm engine runs on the page's one
+ * thread, so a job cannot run beside the UI: it is queued and starts after a short delay, one at a
+ * time. Until it starts it can be cancelled (`jobs.cancel`, which an agent only gets in edgewise if
+ * the job waits a moment); once it runs it finishes, as nothing can interrupt a running command here.
+ */
+interface Job {
+  id: number;
+  command: string;
+  state: 'running' | 'done' | 'failed' | 'cancelled';
+  result?: unknown;
+  error?: string;
+  timer?: ReturnType<typeof setTimeout>;
+}
+const jobs: Job[] = [];
+let nextJob = 1;
+const KEPT_JOBS = 50;
+/** How long a job waits before it starts, so that a cancel sent right after it can still stop it. */
+export const JOB_START_DELAY_MS = 250;
+let lastJobEnd = 0;
+
+function startJob(app: App, command: string, params: Record<string, unknown>): unknown {
+  const job: Job = { id: nextJob++, command, state: 'running' };
+  jobs.push(job);
+  const old = jobs.length > KEPT_JOBS ? jobs.findIndex((j) => j.state !== 'running') : -1;
+  if (old >= 0) jobs.splice(old, 1);
+  // One job at a time, each at least the delay after the previous one ended.
+  const wait = Math.max(JOB_START_DELAY_MS, lastJobEnd + JOB_START_DELAY_MS - Date.now());
+  job.timer = setTimeout(() => {
+    try {
+      job.result = runCommand(app, command, params);
+      job.state = 'done';
+    } catch (e) {
+      job.error = e instanceof Error ? e.message : String(e);
+      job.state = 'failed';
+    }
+    lastJobEnd = Date.now();
+  }, wait);
+  return { job: job.id, pending: true };
+}
+
+function listJobs(_app: App): unknown {
+  return {
+    jobs: jobs.map((j) => ({ id: j.id, command: j.command, label: j.command, state: j.state, ...(j.result !== undefined ? { result: j.result } : {}), ...(j.error ? { error: j.error } : {}) })),
+  };
+}
+
+function cancelJobs(which: unknown): unknown {
+  const wanted = which === undefined ? null : Number(which);
+  if (wanted !== null && !jobs.some((j) => j.id === wanted)) fail(`jobs.cancel: no job ${String(which)}`);
+  let cancelled = 0;
+  for (const j of jobs) {
+    if (j.state !== 'running' || (wanted !== null && j.id !== wanted)) continue;
+    clearTimeout(j.timer);
+    j.state = 'cancelled';
+    cancelled++;
+  }
+  return { cancelled };
+}
+
 /** Runs one control request. Throws with a message an agent can act on. */
 export async function handleControl(app: App, req: ControlRequest): Promise<unknown> {
   const p = object(req.params, req.method);
@@ -166,10 +233,9 @@ export async function handleControl(app: App, req: ControlRequest): Promise<unkn
     case 'engine.execute':
     case 'ui.menu.invoke': {
       const id = String(p.command ?? p.id ?? fail(`${req.method}: \`command\` is required`));
-      const result = app.engine.execute(id, object(p.params, id));
-      app.preview = null;
-      app.refresh();
-      return result ?? null;
+      const params = object(p.params, id);
+      if (req.method === 'engine.execute' && p.wait === false) return startJob(app, id, params);
+      return runCommand(app, id, params);
     }
     case 'engine.batch': {
       const steps = Array.isArray(p.steps) ? p.steps : fail('engine.batch: steps must be an array');
@@ -191,7 +257,7 @@ export async function handleControl(app: App, req: ControlRequest): Promise<unkn
       return pointer(app, p);
     case 'app.openBytes': {
       const name = String(p.name ?? fail('app.openBytes: name is required'));
-      const result = app.engine.open(name, decode(String(p.base64 ?? '')));
+      const result = app.engine.open(name, decode(String(p.base64 ?? '')), typeof p.path === 'string' ? p.path : undefined);
       app.refresh();
       return result ?? null;
     }
@@ -207,10 +273,25 @@ export async function handleControl(app: App, req: ControlRequest): Promise<unkn
       if (!app.doc) fail('app.save: no document is open');
       return { base64: encode(app.engine.export(String(p.format ?? 'png'))), name: app.doc.name };
     }
+    case 'app.exportFiles': {
+      if (!app.doc) fail('no document is open');
+      const kind = p.kind === 'dataSets' ? 'dataSets' : 'layers';
+      const { kind: _kind, ...options } = p;
+      return { files: app.engine.exportFiles(kind, options).map((f) => ({ name: f.name, base64: encode(f.bytes) })) };
+    }
+    case 'app.importDataSets': {
+      if (!app.doc) fail('no document is open');
+      const { text, ...options } = p;
+      const result = app.engine.importDataSets(String(text ?? ''), options);
+      app.refresh();
+      return result ?? null;
+    }
+    case 'app.writeBackPath':
+      return { path: app.engine.writeBackPath() };
     case 'jobs.list':
-      return { running: [], finished: [] };
+      return listJobs(app);
     case 'jobs.cancel':
-      return { cancelled: [] };
+      return cancelJobs(p.job);
     default:
       fail(`unknown method \`${req.method}\``);
   }
