@@ -257,6 +257,74 @@ pub fn unsharp_mask(px: &mut [u8], width: usize, height: usize, amount: f64, rad
 /// Applies the preview of engine command `command` with slider `values` to `px`, a `width` by
 /// `height` frame. `scale` is frame pixels per document pixel, so radii match the engine's.
 /// Returns `false` for a command with no preview.
+/// Averages each `cell` x `cell` block into one flat colour (alpha-weighted).
+pub fn mosaic(px: &mut [u8], width: usize, height: usize, cell: f64) {
+    let cell = cell.round().max(1.0) as usize;
+    if cell < 2 || px.len() < width * height * 4 {
+        return;
+    }
+    for y0 in (0..height).step_by(cell) {
+        for x0 in (0..width).step_by(cell) {
+            let (y1, x1) = ((y0 + cell).min(height), (x0 + cell).min(width));
+            let mut sum = [0f64; 4];
+            for y in y0..y1 {
+                for x in x0..x1 {
+                    let i = (y * width + x) * 4;
+                    let a = f64::from(px[i + 3]);
+                    for c in 0..3 {
+                        sum[c] += f64::from(px[i + c]) * a;
+                    }
+                    sum[3] += a;
+                }
+            }
+            let n = ((y1 - y0) * (x1 - x0)) as f64;
+            let rgb = |c: usize| if sum[3] > 0.0 { clamp8(sum[c] / sum[3]) } else { 0 };
+            let out = [rgb(0), rgb(1), rgb(2), clamp8(sum[3] / n)];
+            for y in y0..y1 {
+                for x in x0..x1 {
+                    let i = (y * width + x) * 4;
+                    px[i..i + 4].copy_from_slice(&out);
+                }
+            }
+        }
+    }
+}
+
+/// Grey relief: the light difference across `height` pixels along `angle` (degrees), scaled by
+/// `amount` percent, around mid-grey.
+pub fn emboss(px: &mut [u8], width: usize, height: usize, angle: f64, depth: f64, amount: f64) {
+    if px.len() < width * height * 4 || width == 0 || height == 0 {
+        return;
+    }
+    let lum: Vec<f64> = px.chunks_exact(4).map(|p| luma(f64::from(p[0]), f64::from(p[1]), f64::from(p[2]))).collect();
+    let (dx, dy) = (angle.to_radians().cos() * depth.max(1.0), -angle.to_radians().sin() * depth.max(1.0));
+    let at = |x: usize, y: usize, sx: f64, sy: f64| {
+        let xx = (x as f64 + sx).round().clamp(0.0, (width - 1) as f64) as usize;
+        let yy = (y as f64 + sy).round().clamp(0.0, (height - 1) as f64) as usize;
+        lum[yy * width + xx]
+    };
+    for y in 0..height {
+        for x in 0..width {
+            let v = clamp8(128.0 + (at(x, y, dx, dy) - at(x, y, -dx, -dy)) * amount / 100.0);
+            let i = (y * width + x) * 4;
+            px[i] = v;
+            px[i + 1] = v;
+            px[i + 2] = v;
+        }
+    }
+}
+
+/// Keeps only detail finer than `radius`: the pixel minus its blur, around mid-grey.
+pub fn high_pass(px: &mut [u8], width: usize, height: usize, radius: f64) {
+    let mut blurred = px.to_vec();
+    gaussian_blur(&mut blurred, width, height, radius);
+    for (p, b) in px.chunks_exact_mut(4).zip(blurred.chunks_exact(4)) {
+        for c in 0..3 {
+            p[c] = clamp8(128.0 + f64::from(p[c]) - f64::from(b[c]));
+        }
+    }
+}
+
 pub fn preview(command: &str, values: &Values, px: &mut [u8], width: usize, height: usize, scale: f64) -> bool {
     match command {
         "image.adjustments.brightnessContrast" => brightness_contrast(px, get(values, "brightness", 0.0), get(values, "contrast", 0.0)),
@@ -265,6 +333,9 @@ pub fn preview(command: &str, values: &Values, px: &mut [u8], width: usize, heig
         "image.adjustments.vibrance" => vibrance(px, get(values, "vibrance", 0.0)),
         "filter.blur.gaussianBlur" => gaussian_blur(px, width, height, get(values, "radius", 0.0) * scale),
         "filter.sharpen.unsharpMask" => unsharp_mask(px, width, height, get(values, "amount", 0.0), get(values, "radius", 1.0) * scale),
+        "filter.pixelate.mosaic" => mosaic(px, width, height, get(values, "cellSize", 10.0) * scale),
+        "filter.stylize.emboss" => emboss(px, width, height, get(values, "angle", 135.0), get(values, "height", 3.0) * scale, get(values, "amount", 100.0)),
+        "filter.other.highPass" => high_pass(px, width, height, get(values, "radius", 10.0) * scale),
         "image.adjustments.invert" => invert(px),
         "image.adjustments.desaturate" => desaturate(px),
         "image.autoContrast" => auto_levels(px),
@@ -401,5 +472,37 @@ mod tests {
         assert!(preview("image.adjustments.invert", &Values::new(), &mut p, 1, 1, 1.0));
         assert_eq!(p[0], 255);
         assert!(!preview("file.new", &Values::new(), &mut p, 1, 1, 1.0));
+    }
+
+    #[test]
+    fn mosaic_flattens_each_cell_to_its_average() {
+        let mut px = vec![0, 0, 0, 255, 200, 200, 200, 255, 0, 0, 0, 255, 200, 200, 200, 255];
+        mosaic(&mut px, 2, 2, 2.0);
+        assert!(px.chunks_exact(4).all(|p| p == [100, 100, 100, 255]), "{px:?}");
+    }
+
+    #[test]
+    fn emboss_is_flat_grey_on_flat_colour_and_marks_edges() {
+        let mut flat = vec![50, 90, 200, 255].repeat(16);
+        emboss(&mut flat, 4, 4, 135.0, 1.0, 100.0);
+        assert!(flat.chunks_exact(4).all(|p| p[0] == 128 && p[1] == 128 && p[2] == 128));
+        let mut edge: Vec<u8> = (0..16).flat_map(|i| if i % 4 < 2 { [0, 0, 0, 255] } else { [255, 255, 255, 255] }).collect();
+        emboss(&mut edge, 4, 4, 0.0, 1.0, 100.0);
+        assert_ne!(edge[4 + 4 * 0 + 0], 128);
+    }
+
+    #[test]
+    fn high_pass_of_flat_colour_is_mid_grey() {
+        let mut px = vec![30, 120, 220, 255].repeat(25);
+        high_pass(&mut px, 5, 5, 2.0);
+        assert!(px.chunks_exact(4).all(|p| p[..3].iter().all(|v| v.abs_diff(128) <= 1)));
+    }
+
+    #[test]
+    fn preview_knows_the_new_filters() {
+        let mut px = vec![10, 20, 30, 255].repeat(4);
+        for id in ["filter.pixelate.mosaic", "filter.stylize.emboss", "filter.other.highPass"] {
+            assert!(preview(id, &Values::new(), &mut px, 2, 2, 1.0), "{id}");
+        }
     }
 }

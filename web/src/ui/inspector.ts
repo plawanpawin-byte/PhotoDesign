@@ -135,6 +135,17 @@ export const ADJUST_GROUPS: readonly AdjustGroup[] = [
     { key: 'amount', label: 'Amount', min: 1, max: 500, step: 1, value: 80 },
     { key: 'radius', label: 'Radius', min: 0.1, max: 50, step: 0.1, value: 1.5 },
   ] },
+  { title: 'Mosaic', note: 'Flat blocks of colour', command: 'filter.pixelate.mosaic', controls: [
+    { key: 'cellSize', label: 'Cell size', min: 2, max: 200, step: 1, value: 10 },
+  ] },
+  { title: 'Emboss', note: 'Grey relief', command: 'filter.stylize.emboss', controls: [
+    { key: 'angle', label: 'Angle', min: -180, max: 180, step: 1, value: 135 },
+    { key: 'height', label: 'Height', min: 1, max: 100, step: 1, value: 3 },
+    { key: 'amount', label: 'Amount', min: 1, max: 500, step: 1, value: 100 },
+  ] },
+  { title: 'High pass', note: 'Keep only fine detail', command: 'filter.other.highPass', controls: [
+    { key: 'radius', label: 'Radius', min: 0.1, max: 250, step: 0.1, value: 10 },
+  ] },
 ];
 
 const QUICK: readonly [string, string][] = [
