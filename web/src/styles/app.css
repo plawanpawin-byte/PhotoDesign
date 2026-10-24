@@ -134,8 +134,8 @@ input[type='checkbox'] { accent-color: var(--brand); }
 .empty-note { color: var(--text-faint); padding: 4px 2px; margin: 0; }
 .layers, .history { display: flex; flex-direction: column; gap: 4px; height: 100%; }
 .layer-props { display: flex; flex-direction: column; gap: 2px; }
-.prop-row { display: grid; grid-template-columns: 70px 1fr auto; align-items: center; gap: 6px; min-height: 22px; }
-.prop-row output { min-width: 32px; text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
+.prop-row { display: grid; grid-template-columns: 56px minmax(0, 1fr) 44px; align-items: center; gap: 6px; min-height: 22px; }
+.prop-row output { min-width: 0; overflow: hidden; white-space: nowrap; text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
 .prop-label { color: var(--text-dim); }
 .prop-row select { grid-column: 2 / 4; height: 22px; border-radius: var(--radius-xs); background: var(--field); border: 1px solid var(--line-soft); padding: 0 4px; }
 .layer-list { list-style: none; margin: 0; padding: 0; background: var(--field); border: 1px solid var(--line); flex: 1; overflow: auto; min-height: 80px; }
