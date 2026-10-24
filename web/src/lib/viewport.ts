@@ -1,4 +1,6 @@
-// The canvas view: where the document sits on screen. Pure maths, no DOM.
+import { native } from './native';
+
+// The canvas view: where the document sits on screen. The maths itself is in Rust.
 
 export interface Point {
   x: number;
@@ -24,23 +26,20 @@ export const MAX_ZOOM = 64;
 /** Zoom steps the +/- buttons and keys walk through. */
 export const ZOOM_STEPS = [0.01, 0.02, 0.03, 0.05, 0.0833, 0.125, 0.1667, 0.25, 0.3333, 0.5, 0.6667, 1, 1.5, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64];
 
+const view = (v: ArrayLike<number>): View => ({ zoom: v[0]!, x: v[1]!, y: v[2]! });
+
 export function clampZoom(zoom: number): number {
-  if (!Number.isFinite(zoom) || zoom <= 0) return 1;
-  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom));
+  return native().view_clamp_zoom(zoom);
 }
 
 /** The whole document centred in the viewport, with `margin` screen pixels around it, never above 100%. */
 export function fit(doc: Size, viewport: Size, margin = 48): View {
-  const w = Math.max(1, viewport.width - margin * 2);
-  const h = Math.max(1, viewport.height - margin * 2);
-  const zoom = clampZoom(Math.min(1, w / Math.max(1, doc.width), h / Math.max(1, doc.height)));
-  return centre(doc, viewport, zoom);
+  return view(native().view_fit(doc.width, doc.height, viewport.width, viewport.height, margin));
 }
 
 /** The document centred at `zoom`. */
 export function centre(doc: Size, viewport: Size, zoom: number): View {
-  const z = clampZoom(zoom);
-  return { zoom: z, x: Math.round((viewport.width - doc.width * z) / 2), y: Math.round((viewport.height - doc.height * z) / 2) };
+  return view(native().view_centre(doc.width, doc.height, viewport.width, viewport.height, zoom));
 }
 
 export function toDoc(view: View, screen: Point): Point {
@@ -52,16 +51,13 @@ export function toScreen(view: View, doc: Point): Point {
 }
 
 /** Zoom to `zoom`, keeping the document point under `anchor` (screen) where it is. */
-export function zoomAt(view: View, zoom: number, anchor: Point): View {
-  const z = clampZoom(zoom);
-  const d = toDoc(view, anchor);
-  return { zoom: z, x: anchor.x - d.x * z, y: anchor.y - d.y * z };
+export function zoomAt(current: View, zoom: number, anchor: Point): View {
+  return view(native().view_zoom_at(current.zoom, current.x, current.y, zoom, anchor.x, anchor.y));
 }
 
 /** The next zoom step in `direction` (+1 in, -1 out) from `zoom`. */
 export function stepZoom(zoom: number, direction: 1 | -1): number {
-  if (direction > 0) return ZOOM_STEPS.find((s) => s > zoom * 1.001) ?? MAX_ZOOM;
-  return [...ZOOM_STEPS].reverse().find((s) => s < zoom / 1.001) ?? MIN_ZOOM;
+  return native().view_step_zoom(zoom, direction);
 }
 
 export function pan(view: View, dx: number, dy: number): View {
@@ -69,6 +65,5 @@ export function pan(view: View, dx: number, dy: number): View {
 }
 
 export function formatZoom(zoom: number): string {
-  const pct = zoom * 100;
-  return `${pct >= 10 ? Math.round(pct) : Number(pct.toFixed(1))}%`;
+  return native().view_format_zoom(zoom);
 }

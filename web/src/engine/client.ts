@@ -1,3 +1,4 @@
+import { useNative } from '../lib/native';
 import type { CommandInfo, EngineApi, EngineState, Frame } from './types';
 
 /** The free functions the wasm package exports next to the engine class. */
@@ -101,5 +102,6 @@ export class EngineClient implements EngineApi {
 export async function loadEngine(): Promise<EngineClient> {
   const pkg = await import('./pkg/photodesign_wasm.js');
   await pkg.default();
+  useNative(pkg);
   return new EngineClient(new pkg.Engine(), pkg);
 }

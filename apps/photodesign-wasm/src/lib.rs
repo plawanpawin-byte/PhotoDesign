@@ -7,6 +7,7 @@
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
 pub mod imaging;
+pub mod view;
 
 use photocraft_engine::{Session, command_specs, commands, file_cmds, inspect};
 use serde_json::{Value, json};
@@ -166,6 +167,56 @@ pub mod web {
     #[wasm_bindgen]
     pub fn tone_histogram(rgba: &[u8]) -> Vec<u32> {
         crate::imaging::histogram(rgba).flat()
+    }
+
+    /// `[zoom, x, y]` with the document centred in the viewport.
+    #[wasm_bindgen]
+    pub fn view_centre(doc_w: f64, doc_h: f64, view_w: f64, view_h: f64, zoom: f64) -> Vec<f64> {
+        crate::view::centre(doc_w, doc_h, view_w, view_h, zoom).to_vec()
+    }
+
+    /// `[zoom, x, y]` fitting the whole document in the viewport.
+    #[wasm_bindgen]
+    pub fn view_fit(doc_w: f64, doc_h: f64, view_w: f64, view_h: f64, margin: f64) -> Vec<f64> {
+        crate::view::fit(doc_w, doc_h, view_w, view_h, margin).to_vec()
+    }
+
+    /// `[zoom, x, y]` after zooming around a screen point.
+    #[wasm_bindgen]
+    pub fn view_zoom_at(zoom: f64, x: f64, y: f64, to: f64, anchor_x: f64, anchor_y: f64) -> Vec<f64> {
+        crate::view::zoom_at([zoom, x, y], to, anchor_x, anchor_y).to_vec()
+    }
+
+    #[wasm_bindgen]
+    pub fn view_clamp_zoom(zoom: f64) -> f64 {
+        crate::view::clamp_zoom(zoom)
+    }
+
+    #[wasm_bindgen]
+    pub fn view_step_zoom(zoom: f64, direction: i32) -> f64 {
+        crate::view::step_zoom(zoom, direction)
+    }
+
+    #[wasm_bindgen]
+    pub fn view_format_zoom(zoom: f64) -> String {
+        crate::view::format_zoom(zoom)
+    }
+
+    /// Command-search score, -1 when the query doesn't match.
+    #[wasm_bindgen]
+    pub fn fuzzy_score(query: &str, text: &str) -> f64 {
+        crate::view::fuzzy_score(query, text)
+    }
+
+    #[wasm_bindgen]
+    pub fn colour_to_hex(r: f64, g: f64, b: f64) -> String {
+        crate::view::to_hex(r, g, b)
+    }
+
+    /// 0..1 channels for a hex colour, or an empty array when it isn't one.
+    #[wasm_bindgen]
+    pub fn colour_from_hex(hex: &str) -> Vec<f64> {
+        crate::view::from_hex(hex).map(|c| c.to_vec()).unwrap_or_default()
     }
 }
 
