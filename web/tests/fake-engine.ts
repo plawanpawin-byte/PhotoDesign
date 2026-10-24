@@ -61,6 +61,14 @@ export class FakeEngine implements EngineApi {
     const h = Math.min(maxSide, this.doc?.height ?? 1);
     return { width: w, height: h, pixels: new Uint8Array(w * h * 4).fill(255) };
   }
+  previews: string[] = [];
+  preview(command: string, _values: Record<string, number>, pixels: Uint8Array): Uint8Array {
+    this.previews.push(command);
+    return pixels.slice();
+  }
+  histogram(): Uint32Array {
+    return new Uint32Array(1024);
+  }
   export(): Uint8Array {
     return new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
   }

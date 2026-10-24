@@ -2,10 +2,9 @@
 // interface when something changed. Every edit is an engine command.
 import { EngineError } from './engine/client';
 import { t } from './lib/i18n';
-import type { CommandInfo, DocumentInfo, EngineApi, EngineState, LayerInfo } from './engine/types';
+import type { CommandInfo, DocumentInfo, EngineApi, EngineState, LayerInfo, Preview } from './engine/types';
 import { toHex } from './lib/color';
 import { fit, type Size, type View } from './lib/viewport';
-import type { PreviewFn } from './imaging/preview';
 import { ToolHand } from './tools/tools';
 
 export interface BrushSettings {
@@ -67,7 +66,7 @@ export class App {
   cropRect: Rect | null = null;
   toasts: Toast[] = [];
   /** A live, not yet applied, adjustment shown on the canvas. */
-  preview: PreviewFn | null = null;
+  preview: Preview | null = null;
   private commandCache: CommandInfo[] | null = null;
   private listeners = new Map<Topic, Set<() => void>>();
   private toastSeq = 0;
@@ -182,9 +181,9 @@ export class App {
     this.emit('settings');
   }
 
-  setPreview(fn: PreviewFn | null) {
-    if (!fn && !this.preview) return;
-    this.preview = fn;
+  setPreview(preview: Preview | null) {
+    if (!preview && !this.preview) return;
+    this.preview = preview;
     this.emit('preview');
   }
 

@@ -6,6 +6,8 @@
 //! anything the CLI, the control channel or an agent can.
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
+pub mod imaging;
+
 use photocraft_engine::{Session, command_specs, commands, file_cmds, inspect};
 use serde_json::{Value, json};
 
@@ -148,6 +150,22 @@ pub mod web {
         pub fn export(&self, name_or_ext: &str) -> Result<Vec<u8>, JsError> {
             self.studio.export(name_or_ext).map_err(fail)
         }
+    }
+
+    /// Previews engine command `command` (slider values as a JSON object) on a copy of `rgba`.
+    /// Returns the input unchanged for a command with no preview.
+    #[wasm_bindgen]
+    pub fn preview_pixels(command: &str, values: &str, rgba: &[u8], width: u32, height: u32, scale: f64) -> Result<Vec<u8>, JsError> {
+        let values: crate::imaging::Values = serde_json::from_str(values).map_err(|e| fail(format!("{command}: bad values: {e}")))?;
+        let mut px = rgba.to_vec();
+        crate::imaging::preview(command, &values, &mut px, width as usize, height as usize, scale);
+        Ok(px)
+    }
+
+    /// 1024 counts: red, green, blue and luma bins, 256 each.
+    #[wasm_bindgen]
+    pub fn tone_histogram(rgba: &[u8]) -> Vec<u32> {
+        crate::imaging::histogram(rgba).flat()
     }
 }
 

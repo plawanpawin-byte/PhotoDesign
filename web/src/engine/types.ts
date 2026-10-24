@@ -75,4 +75,14 @@ export interface EngineApi {
   revision(): number;
   render(maxSide: number): Frame;
   export(nameOrExt: string): Uint8Array;
+  /** The frame with the adjustment `command` (slider `values`) applied, worked out in Rust. `scale` is frame pixels per document pixel. */
+  preview(command: string, values: Record<string, number>, pixels: Uint8Array, width: number, height: number, scale: number): Uint8Array;
+  /** 1024 counts: red, green, blue and luma bins of 256 each. */
+  histogram(pixels: Uint8Array): Uint32Array;
+}
+
+/** A live, not yet applied, adjustment shown on the canvas. */
+export interface Preview {
+  command: string;
+  values: Record<string, number>;
 }

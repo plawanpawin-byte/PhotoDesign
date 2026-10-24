@@ -89,16 +89,19 @@ export function canvasView(app: App): HTMLElement {
 
   /** The frame with the pending adjustment applied, or `null` when nothing is being previewed. */
   const previewImage = (docWidth: number): HTMLCanvasElement | null => {
-    const fn = app.preview;
-    if (!fn || !base) return null;
-    if (shownFor === fn && shown) return shown;
-    const px = new Uint8ClampedArray(base.data);
-    fn(px, base.width, base.height, base.width / Math.max(1, docWidth));
-    tinted.width = base.width;
-    tinted.height = base.height;
-    tinted.getContext('2d')?.putImageData(new ImageData(px, base.width, base.height), 0, 0);
-    shown = tinted;
-    shownFor = fn;
+    const p = app.preview;
+    if (!p || !base) return null;
+    if (shownFor === p && shown) return shown;
+    try {
+      const px = app.engine.preview(p.command, p.values, new Uint8Array(base.data.buffer, base.data.byteOffset, base.data.byteLength), base.width, base.height, base.width / Math.max(1, docWidth));
+      tinted.width = base.width;
+      tinted.height = base.height;
+      tinted.getContext('2d')?.putImageData(new ImageData(new Uint8ClampedArray(px.buffer as ArrayBuffer, px.byteOffset, px.byteLength), base.width, base.height), 0, 0);
+      shown = tinted;
+      shownFor = p;
+    } catch {
+      return null;
+    }
     return shown;
   };
 

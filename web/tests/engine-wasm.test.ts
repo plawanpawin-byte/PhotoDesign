@@ -12,7 +12,7 @@ describe.skipIf(!built)('wasm engine', () => {
   async function engine(): Promise<EngineClient> {
     const pkg = await import('../src/engine/pkg/photodesign_wasm.js');
     pkg.initSync({ module: readFileSync(join(pkgDir, 'photodesign_wasm_bg.wasm')) });
-    return new EngineClient(new pkg.Engine());
+    return new EngineClient(new pkg.Engine(), pkg);
   }
 
   it('creates, paints, undoes and exports', async () => {
@@ -45,5 +45,16 @@ describe.skipIf(!built)('wasm engine', () => {
     expect(() => e.execute('filter.blur.gaussianBlur', { radius: 2 })).toThrow(EngineError);
     expect(() => e.execute('no.such.command')).toThrow(/unknown command/);
     expect(() => e.render(10)).toThrow();
+  });
+
+  it('previews an adjustment and reports a histogram in Rust', async () => {
+    const e = await engine();
+    const white = new Uint8Array(4 * 4).fill(255);
+    const inverted = e.preview('image.adjustments.invert', {}, white, 2, 2, 1);
+    expect([...inverted.slice(0, 4)]).toEqual([0, 0, 0, 255]);
+    expect([...e.preview('file.new', {}, white, 2, 2, 1)]).toEqual([...white]);
+    const bins = e.histogram(white);
+    expect(bins).toHaveLength(1024);
+    expect(bins[255]).toBe(4);
   });
 });

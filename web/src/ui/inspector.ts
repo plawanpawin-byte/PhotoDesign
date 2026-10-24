@@ -4,8 +4,6 @@ import { findLayer } from '../app';
 import type { LayerInfo } from '../engine/types';
 import { t } from '../lib/i18n';
 import { clear, h, icon } from './dom';
-import { histogram } from '../imaging/histogram';
-import { previewFor } from '../imaging/preview';
 import { ICONS } from './icons';
 
 type Tab = 'layers' | 'adjust' | 'image' | 'history';
@@ -156,13 +154,13 @@ function histogramView(app: App): HTMLElement {
     ctx.clearRect(0, 0, 256, 64);
     try {
       const frame = app.engine.render(192);
-      const hist = histogram(frame.pixels);
-      const peak = Math.max(1, ...hist.luma.slice(1, 255));
+      const bins = app.engine.histogram(frame.pixels);
+      const peak = Math.max(1, ...bins.slice(768 + 1, 768 + 255));
       ctx.globalCompositeOperation = 'lighter';
-      for (const [bins, color] of [[hist.r, '#f0506e'], [hist.g, '#46c882'], [hist.b, '#4a86e8']] as const) {
+      for (const [channel, color] of [[0, '#f0506e'], [1, '#46c882'], [2, '#4a86e8']] as const) {
         ctx.fillStyle = color;
         for (let i = 0; i < 256; i++) {
-          const n = Math.min(64, (bins[i]! / peak) * 64);
+          const n = Math.min(64, (bins[channel * 256 + i]! / peak) * 64);
           ctx.globalAlpha = 0.55;
           ctx.fillRect(i, 64 - n, 1, n);
         }
@@ -186,13 +184,13 @@ function adjustView(app: App): HTMLElement {
       input.addEventListener('input', () => {
         values[c.key] = Number(input.value);
         out.textContent = input.value;
-        app.setPreview(previewFor(g.command, { ...values }));
+        app.setPreview({ command: g.command, values: { ...values } });
       });
       input.addEventListener('dblclick', () => {
         input.value = String(c.value);
         values[c.key] = c.value;
         out.textContent = String(c.value);
-        app.setPreview(previewFor(g.command, { ...values }));
+        app.setPreview({ command: g.command, values: { ...values } });
       });
       return h('div.prop-row', h('span.prop-label', t(c.label)), input, out);
     });
