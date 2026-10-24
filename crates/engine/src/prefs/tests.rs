@@ -416,6 +416,10 @@ fn menus_and_toolbar_customisation_persist() {
     s.execute("edit.menus", json!({"show": ["edit.fade"], "color": {"edit.fill": "none"}})).unwrap();
     assert!(s.prefs().menus.hidden.is_empty() && s.prefs().menus.colors.is_empty());
     s.execute("edit.toolbar", json!({"hidden": ["Sponge"]})).unwrap();
+    // A misspelled key is refused and names the keys it accepts, rather than doing nothing.
+    let e = s.execute("edit.menus", json!({"colors": {"edit.fill": "red"}})).unwrap_err().to_string();
+    assert!(e.contains("colors") && e.contains("color"), "{e}");
+    assert!(s.execute("edit.toolbar", json!({"hiden": ["Sponge"]})).is_err());
     let back: Preferences = serde_json::from_str(&s.prefs_to_json()).unwrap();
     assert_eq!(back.toolbar.hidden, vec!["Sponge".to_string()]);
 }

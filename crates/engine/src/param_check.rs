@@ -22,7 +22,7 @@ use crate::{EngineError, Result};
 const UNIVERSAL: &[&str] = &["coalesce", "target"];
 
 /// The commands whose unknown params are rejected: their `params` doc is complete.
-const STRICT: &[&str] = &["layer.hideLayers", "layer.showLayers"];
+const STRICT: &[&str] = &["layer.hideLayers", "layer.showLayers", "edit.menus", "edit.toolbar"];
 
 /// The keys a `params` doc names, or `None` when the doc is open-ended.
 fn documented_keys(doc: &str) -> Option<Vec<&str>> {
