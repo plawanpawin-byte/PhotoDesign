@@ -63,6 +63,20 @@ describe('control channel (AI agents)', () => {
     await expect(call(app, 'ui.pointer', { events: [{ kind: 'press', x: 1, y: 1 }] })).rejects.toThrow(/kind/);
   });
 
+  it('keeps the first Type field\'s text when a second click opens another', async () => {
+    const { app, engine } = setup();
+    await call(app, 'engine.execute', { command: 'file.new', params: { width: 100, height: 100 } });
+    await call(app, 'ui.set', { tool: 'type' });
+    await call(app, 'ui.pointer', { events: [{ kind: 'down', x: 10, y: 10 }, { kind: 'up', x: 10, y: 10 }] });
+    const first = document.querySelector<HTMLInputElement>('.type-entry');
+    expect(first).not.toBeNull();
+    first!.focus();
+    first!.value = 'Hi';
+    await call(app, 'ui.pointer', { events: [{ kind: 'down', x: 50, y: 50 }, { kind: 'up', x: 50, y: 50 }] });
+    expect(engine.calls.find(([id]) => id === 'type.create')?.[1]).toMatchObject({ text: 'Hi' });
+    expect(document.querySelectorAll('.type-entry')).toHaveLength(1);
+  });
+
   it('gives each AI client a configuration that starts the MCP bridge', () => {
     const configs = agentConfigs({ port: 7878, tokenFile: '/home/me/.photodesign/control.token', root: '/home/me/Documents/PhotoDesign', cli: '/opt/PhotoDesign/bin/photodesign-cli', cliFound: true });
     expect(INSTALL_COMMAND).toContain('--install-mcp');

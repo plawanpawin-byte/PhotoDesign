@@ -584,7 +584,8 @@ function drawStrokePreview(ctx: CanvasRenderingContext2D, stroke: Stroke, app: A
 
 /** The Type tool: a text field at the click; Enter makes a type layer, Escape or leaving it cancels. */
 function typeAt(app: App, stage: HTMLElement, at: Point, screen: Point) {
-  stage.querySelector('.type-entry')?.remove();
+  // Leaving an open field commits its text, as clicking away does; removing it outright re-enters its own blur handler.
+  stage.querySelector<HTMLInputElement>('.type-entry')?.blur();
   const input = h('input.type-entry', { type: 'text', placeholder: t('Type, then Enter'), 'aria-label': t('Type') }) as HTMLInputElement;
   Object.assign(input.style, { left: `${screen.x}px`, top: `${screen.y - 14}px`, color: app.foreground, fontSize: `${Math.max(11, Math.min(64, app.retouch.typeSize * app.view.zoom))}px` });
   let done = false;
@@ -592,7 +593,7 @@ function typeAt(app: App, stage: HTMLElement, at: Point, screen: Point) {
     if (done) return;
     done = true;
     const text = input.value;
-    input.remove();
+    if (input.isConnected) input.remove();
     if (commit && text.trim()) app.run('type.create', { x: Math.round(at.x), y: Math.round(at.y), text, size: app.retouch.typeSize, color: app.foreground });
   };
   input.addEventListener('keydown', (e) => {
