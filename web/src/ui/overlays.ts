@@ -74,7 +74,7 @@ export interface AgentInfo {
 
 /** One PowerShell line that connects Claude Code, Codex and Antigravity for the installed Windows app. */
 export const INSTALL_COMMAND =
-  '$exe = (Get-ChildItem "$env:LOCALAPPDATA\\Programs" -Filter "PhotoDesign.exe" -Recurse -EA 0 | Select-Object -First 1).FullName; & $exe --install-mcp';
+  '$exe = Get-ChildItem "$env:LOCALAPPDATA\\Programs","$env:ProgramFiles" -Filter "PhotoDesign.exe" -Recurse -EA 0 | Select-Object -First 1 -ExpandProperty FullName; if ($exe) { & $exe --install-mcp } else { "PhotoDesign is not installed: use the installer, or from the source folder run: cd desktop; npm run connect" }';
 
 /** The MCP server's configuration for AI clients, ready to copy. */
 export function agentConfigs(info: AgentInfo): { name: string; text: string }[] {

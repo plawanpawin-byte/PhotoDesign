@@ -8,7 +8,8 @@
     "start": "node run.mjs",
     "electron": "electron .",
     "dist": "node dist.mjs",
-    "cli": "node build-cli.mjs"
+    "cli": "node build-cli.mjs",
+    "connect": "node build-cli.mjs && electron . --install-mcp"
   },
   "devDependencies": {
     "electron": "^33.0.0",

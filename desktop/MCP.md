@@ -32,13 +32,13 @@ npm run cli
 Install `PhotoDesign-Setup`, then run this once in PowerShell and restart Claude Code, Codex or Antigravity:
 
 ```
-$exe = (Get-ChildItem "$env:LOCALAPPDATA\Programs" -Filter "PhotoDesign.exe" -Recurse -EA 0 | Select-Object -First 1).FullName; & $exe --install-mcp
+$exe = Get-ChildItem "$env:LOCALAPPDATA\Programs","$env:ProgramFiles" -Filter "PhotoDesign.exe" -Recurse -EA 0 | Select-Object -First 1 -ExpandProperty FullName; if ($exe) { & $exe --install-mcp } else { "PhotoDesign is not installed: use the installer, or from the source folder run: cd desktop; npm run connect" }
 ```
 
 It adds `photodesign` to each agent's configuration, merging with what is there (other servers stay),
 keeps a `.bak` copy of every file it changes, and writes the result to `install-mcp.log` in the app's
-data folder. Agents that are not installed are skipped. From source the same works with
-`npx electron . --install-mcp` in `desktop`. The portable build cannot be connected this way (it runs
+data folder. Agents that are not installed are skipped. From source (running `npm start`, no installer) use `npm run connect` in `desktop`: it builds the MCP
+server and runs the same step. The portable build cannot be connected this way (it runs
 from a temporary copy); use the installer.
 
 ### By hand
