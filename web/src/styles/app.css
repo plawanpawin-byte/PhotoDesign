@@ -216,3 +216,27 @@ input[type='checkbox'] { accent-color: var(--brand); }
   .tool { width: 40px; height: 40px; }
   .toasts { right: 16px; }
 }
+
+/* more tools: the dock scrolls on short windows */
+.tool-dock { max-height: 100%; overflow-y: auto; scrollbar-width: none; }
+.tool-dock::-webkit-scrollbar { display: none; }
+.tool { width: 44px; height: 40px; flex: none; }
+.dock-sep, .chips, .chip-actions { flex: none; }
+.lang-btn { height: 30px; padding: 0 12px; }
+.segmented { grid-template-columns: repeat(4, 1fr); }
+.seg { padding: 0 4px; font-size: 11.5px; gap: 4px; min-width: 0; }
+.seg span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tile-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 0 4px; }
+.tile-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 56px; padding: 6px 4px; border-radius: 10px; background: var(--field); border: 1px solid transparent; color: var(--text-dim); font-size: 11px; text-align: center; }
+.tile-btn:hover:not(:disabled) { color: var(--text); border-color: var(--sel); background: #1a1f27; }
+.size-row { display: flex; align-items: flex-end; gap: 6px; padding: 0 4px; }
+.size-row .lock { padding-bottom: 8px; }
+.size-row .field input { width: 100%; min-width: 0; }
+.imageview { display: flex; flex-direction: column; gap: 4px; }
+.opt-slider select { height: 26px; border-radius: var(--radius-xs); background: var(--field); border: 1px solid var(--line-soft); padding: 0 6px; }
+body { font-family: var(--font); }
+
+/* four tabs: only the open one shows its name; the rest keep their icon and a tooltip */
+.seg:not(.active) span { display: none; }
+.segmented { grid-template-columns: 1fr 1fr 1fr 1fr; }
+.seg.active { grid-column: span 1; }

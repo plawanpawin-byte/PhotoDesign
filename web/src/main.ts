@@ -2,6 +2,7 @@ import './styles/tokens.css';
 import './styles/app.css';
 import { App } from './app';
 import { loadEngine } from './engine/client';
+import { initLang, onLangChange, t } from './lib/i18n';
 import { actionFor, isTyping, nextBrushSize } from './lib/keys';
 import { centre, stepZoom, zoomAt } from './lib/viewport';
 import { toolByKey } from './tools/tools';
@@ -13,7 +14,10 @@ import { commandPalette, menuPopover, newDocumentDialog, welcome } from './ui/ov
 
 const ACCEPT = '.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff,.psd,.psb,.pcraft,.exr,.hdr,.tga,.dng,.cr2,.cr3,.nef,.arw,.raf,.orf,.rw2,.heic,.heif,.qoi,.ico';
 
-export function mount(root: HTMLElement, app: App) {
+/** Builds the interface into `root`. Returns a function that removes everything it added. */
+export function mount(root: HTMLElement, app: App): () => void {
+  const life = new AbortController();
+  const on = (target: EventTarget, type: string, fn: (e: any) => void, options?: AddEventListenerOptions) => target.addEventListener(type, fn, { ...options, signal: life.signal });
   let overlay: HTMLElement | null = null;
   const closeOverlay = () => {
     overlay?.remove();
@@ -40,7 +44,7 @@ export function mount(root: HTMLElement, app: App) {
   root.append(h('div.shell', topBar(app, actions), h('div.body', toolDock(app), stage, inspector(app)), statusLine(app)), toasts(app), picker);
 
   const mid = () => ({ x: app.viewport.width / 2, y: app.viewport.height / 2 });
-  window.addEventListener('keydown', (e) => {
+  on(window, 'keydown', (e) => {
     if (isTyping(e.target)) return;
     if (overlay) {
       if (e.key === 'Escape') closeOverlay();
@@ -80,44 +84,55 @@ export function mount(root: HTMLElement, app: App) {
       }
     }
   });
-  window.addEventListener('keyup', (e) => app.tools.release(e.key));
-  window.addEventListener('blur', () => app.tools.releaseAll());
+  on(window, 'keyup', (e) => app.tools.release(e.key));
+  on(window, 'blur', () => app.tools.releaseAll());
 
-  root.addEventListener('dragover', (e) => {
+  on(root, 'dragover', (e) => {
     if (e.dataTransfer?.types.includes('Files')) {
       e.preventDefault();
       root.classList.add('dropping');
     }
   });
-  root.addEventListener('dragleave', (e) => {
+  on(root, 'dragleave', (e) => {
     if (e.target === root || !root.contains(e.relatedTarget as Node)) root.classList.remove('dropping');
   });
-  root.addEventListener('drop', (e) => {
+  on(root, 'drop', (e) => {
     e.preventDefault();
     root.classList.remove('dropping');
     if (e.dataTransfer?.files.length) void app.openFiles([...e.dataTransfer.files]);
   });
-  window.addEventListener('paste', (e) => {
+  on(window, 'paste', (e) => {
     if (isTyping(e.target)) return;
     const files = [...(e.clipboardData?.files ?? [])];
     if (files.length) void app.openFiles(files.map((f, i) => (f.name && f.name !== 'image.png' ? f : new File([f], `Pasted ${i + 1}.png`, { type: f.type }))));
   });
-  window.addEventListener('beforeunload', (e) => {
+  on(window, 'beforeunload', (e) => {
     if (app.state.session.documents.some((d) => d.dirty)) e.preventDefault();
   });
+  return () => life.abort();
 }
 
 async function start() {
   const root = document.getElementById('app');
   if (!root) return;
   try {
+    initLang();
     const engine = await loadEngine();
     root.replaceChildren();
     const app = new App(engine);
-    mount(root, app);
+    let dispose = mount(root, app);
+    // Changing language rebuilds the interface; documents and settings live in `app` and stay.
+    onLangChange(() => {
+      dispose();
+      app.detachUi();
+      root.replaceChildren();
+      dispose = mount(root, app);
+      app.refresh();
+      app.fitView();
+    });
     (window as unknown as { photodesign: App }).photodesign = app;
   } catch (e) {
-    root.replaceChildren(h('div.boot-error', h('h1', 'PhotoDesign could not start'), h('p', e instanceof Error ? e.message : String(e)), h('p', 'Build the engine first: npm run engine')));
+    root.replaceChildren(h('div.boot-error', h('h1', t('PhotoDesign could not start')), h('p', e instanceof Error ? e.message : String(e)), h('p', t('Build the engine first: npm run engine'))));
   }
 }
 

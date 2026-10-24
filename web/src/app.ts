@@ -1,6 +1,7 @@
 // The application controller: owns the engine, the view and the tool settings, and tells the
 // interface when something changed. Every edit is an engine command.
 import { EngineError } from './engine/client';
+import { t } from './lib/i18n';
 import type { CommandInfo, DocumentInfo, EngineApi, EngineState, LayerInfo } from './engine/types';
 import { toHex } from './lib/color';
 import { fit, type Size, type View } from './lib/viewport';
@@ -18,7 +19,23 @@ export interface FillSettings {
   contiguous: boolean;
 }
 
-export type Topic = 'state' | 'view' | 'tool' | 'settings' | 'toast';
+export type Topic = 'state' | 'view' | 'tool' | 'settings' | 'toast' | 'crop';
+
+export type SelectMode = 'replace' | 'add' | 'subtract' | 'intersect';
+
+export interface SelectSettings {
+  mode: SelectMode;
+  feather: number;
+}
+
+export type GradientStyle = 'linear' | 'radial' | 'angle' | 'reflected' | 'diamond';
+
+export interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 
 export interface Toast {
   id: number;
@@ -43,6 +60,10 @@ export class App {
   readonly tools = new ToolHand('brush');
   brush: BrushSettings = { size: 24, hardness: 0.8, opacity: 1, flow: 1 };
   fill: FillSettings = { tolerance: 32, contiguous: true };
+  select: SelectSettings = { mode: 'replace', feather: 0 };
+  gradientStyle: GradientStyle = 'linear';
+  /** The crop being drawn, in document pixels, until it is applied or cancelled. */
+  cropRect: Rect | null = null;
   toasts: Toast[] = [];
   private commandCache: CommandInfo[] | null = null;
   private listeners = new Map<Topic, Set<() => void>>();
@@ -59,6 +80,11 @@ export class App {
     if (!set) this.listeners.set(topic, (set = new Set()));
     set.add(fn);
     return () => set.delete(fn);
+  }
+
+  /** Drops every interface listener: the interface is about to be rebuilt (language change). */
+  detachUi() {
+    this.listeners.clear();
   }
 
   emit(topic: Topic) {
@@ -142,6 +168,44 @@ export class App {
     this.emit('settings');
   }
 
+  setSelect(patch: Partial<SelectSettings>) {
+    this.select = { ...this.select, ...patch };
+    this.emit('settings');
+  }
+
+  setGradientStyle(style: GradientStyle) {
+    this.gradientStyle = style;
+    this.emit('settings');
+  }
+
+  setCrop(rect: Rect | null) {
+    this.cropRect = rect;
+    this.emit('crop');
+  }
+
+  /** Crops the document to the pending crop rectangle. */
+  applyCrop() {
+    const r = this.cropRect;
+    const doc = this.doc;
+    if (!r || !doc) return;
+    const x = Math.max(0, Math.round(r.x));
+    const y = Math.max(0, Math.round(r.y));
+    const width = Math.min(doc.width - x, Math.round(r.width));
+    const height = Math.min(doc.height - y, Math.round(r.height));
+    this.setCrop(null);
+    if (width < 1 || height < 1) {
+      this.notify('Nothing to crop', 'error');
+      return;
+    }
+    this.run('image.crop', { x, y, width, height });
+    this.fitView();
+  }
+
+  /** Selects a rectangle or ellipse (document pixels) with the current mode and feather. */
+  selectRect(rect: Rect, ellipse: boolean) {
+    this.run('select.rect', { x: Math.round(rect.x), y: Math.round(rect.y), width: Math.max(1, Math.round(rect.width)), height: Math.max(1, Math.round(rect.height)), ellipse, mode: this.select.mode, feather: this.select.feather });
+  }
+
   newDocument(spec: NewDocumentSpec) {
     this.run('file.new', { width: spec.width, height: spec.height, background: spec.background ?? 'white', resolution: spec.resolution ?? 72, ...(spec.name ? { name: spec.name } : {}) });
   }
@@ -151,7 +215,7 @@ export class App {
       try {
         const bytes = new Uint8Array(await file.arrayBuffer());
         this.engine.open(file.name, bytes);
-        this.notify(`Opened ${file.name}`);
+        this.notify(`${t('Opened')} ${file.name}`);
       } catch (e) {
         this.notify(e instanceof Error ? e.message : String(e), 'error');
       }
@@ -167,7 +231,7 @@ export class App {
       const bytes = this.engine.export(ext);
       const base = doc.name.replace(/\.[^.]+$/, '') || 'Untitled';
       download(bytes, `${base}.${ext}`);
-      this.notify(`Exported ${base}.${ext}`);
+      this.notify(`${t('Exported')} ${base}.${ext}`);
     } catch (e) {
       this.notify(e instanceof Error ? e.message : String(e), 'error');
     }

@@ -22,3 +22,15 @@ or profiled in a headless build, so they are open.
 - `apps/photodesign-wasm/`: the engine bridge (`Studio`, 6 native tests), compiled to WebAssembly.
 - `desktop/`: Electron window for the interface.
 - The default theme of the egui app now uses the Lunatic palette.
+
+## The egui interface is gone
+
+- Removed `crates/ui-egui`, `apps/photocraft`, `apps/photocraft-web`, `apps/photocraft-web-boot` and the
+  xtask `parity` / `i18n-coverage` commands that read them. The engine did not depend on them.
+- The TypeScript interface now has: brush, eraser, fill, gradient, rectangle / ellipse / lasso / magic-wand
+  selection, crop, colour picker, pan, zoom; Layers, Adjust, Image and History views; image rotate, flip
+  and resize; selection grow, shrink, soften, fill and clear; a Thai translation (`web/src/lib/i18n.ts`)
+  with a test that every string has one.
+- Not carried over: text, shapes, paths, masks, smart objects, the plug-in and Camera Raw panels. They
+  are still reachable through the command finder where the engine has a command for them.
+- CI workflows and packaging scripts under `.github/` and `packaging/` still describe the removed apps.

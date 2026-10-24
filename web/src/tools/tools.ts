@@ -1,7 +1,7 @@
 // The tools and which one is in hand. One tool at a time: holding Space (or Alt over a paint tool)
 // puts the selected tool down and picks up another until the key is released.
 
-export type ToolId = 'hand' | 'zoom' | 'brush' | 'eraser' | 'fill' | 'eyedropper';
+export type ToolId = 'hand' | 'zoom' | 'brush' | 'eraser' | 'fill' | 'eyedropper' | 'marquee' | 'ellipse' | 'lasso' | 'wand' | 'gradient' | 'crop';
 
 export interface ToolDef {
   id: ToolId;
@@ -14,7 +14,13 @@ export interface ToolDef {
 export const TOOLS: readonly ToolDef[] = [
   { id: 'brush', label: 'Brush', key: 'B', hint: 'Paint with the foreground colour', cursor: 'none' },
   { id: 'eraser', label: 'Eraser', key: 'E', hint: 'Erase to transparency', cursor: 'none' },
-  { id: 'fill', label: 'Fill', key: 'G', hint: 'Fill similar colours with the foreground', cursor: 'crosshair' },
+  { id: 'fill', label: 'Fill', key: 'F', hint: 'Fill similar colours with the foreground', cursor: 'crosshair' },
+  { id: 'gradient', label: 'Gradient', key: 'G', hint: 'Drag from the start to the end of the gradient', cursor: 'crosshair' },
+  { id: 'marquee', label: 'Marquee', key: 'M', hint: 'Drag to select a rectangle', cursor: 'crosshair' },
+  { id: 'ellipse', label: 'Ellipse', key: 'O', hint: 'Drag to select an ellipse', cursor: 'crosshair' },
+  { id: 'lasso', label: 'Lasso', key: 'L', hint: 'Draw around an area to select it', cursor: 'crosshair' },
+  { id: 'wand', label: 'Magic wand', key: 'W', hint: 'Click to select similar colours', cursor: 'crosshair' },
+  { id: 'crop', label: 'Crop', key: 'C', hint: 'Drag the area to keep, then Apply', cursor: 'crosshair' },
   { id: 'eyedropper', label: 'Pick colour', key: 'I', hint: 'Pick a colour from the image', cursor: 'crosshair' },
   { id: 'hand', label: 'Pan', key: 'H', hint: 'Drag to move around · hold Space', cursor: 'grab' },
   { id: 'zoom', label: 'Zoom', key: 'Z', hint: 'Click to zoom in, Alt-click to zoom out', cursor: 'zoom-in' },

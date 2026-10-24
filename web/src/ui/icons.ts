@@ -28,6 +28,17 @@ export const ICONS = {
   image: '<rect x="3.5" y="5" width="17" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M20.5 15.5l-4.5-4.5-8 8"/>',
   fit: '<path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15"/>',
   chevron: '<path d="M9 6l6 6-6 6"/>',
+  marquee: '<rect x="4.5" y="5.5" width="15" height="13" rx="1" stroke-dasharray="3 2.5"/>',
+  ellipse: '<ellipse cx="12" cy="12" rx="8" ry="6.2" stroke-dasharray="3 2.5"/>',
+  lasso: '<path d="M12 4.5c4.7 0 8 2 8 4.7s-3.3 4.8-8 4.8-8-2-8-4.8S7.3 4.5 12 4.5z" stroke-dasharray="3 2.5"/><path d="M9 13.5c-.8 1.4-.3 3 1.3 3.6 1.4.5 2.2 1.5 1.7 3"/>',
+  wand: '<path d="M5 19L15 9"/><path d="M14 5l.7 1.8L16.5 7.5l-1.8.7L14 10l-.7-1.8-1.8-.7 1.8-.7z"/><path d="M19 12l.5 1.2 1.2.5-1.2.5L19 15.4l-.5-1.2-1.2-.5 1.2-.5z"/>',
+  gradient: '<rect x="4" y="5" width="16" height="14" rx="2"/><path d="M4 9h16M4 13h16" stroke-opacity=".5"/><path d="M7 16l10-8"/><circle cx="7" cy="16" r="1.2"/><circle cx="17" cy="8" r="1.2"/>',
+  crop: '<path d="M7 3.5v13.5h13.5"/><path d="M3.5 7H17v13.5"/>',
+  rotateL: '<path d="M8 8H4V4"/><path d="M4.6 8A8 8 0 1 1 4 12"/>',
+  rotateR: '<path d="M16 8h4V4"/><path d="M19.4 8A8 8 0 1 0 20 12"/>',
+  flipH: '<path d="M12 4v16" stroke-dasharray="2 2.5"/><path d="M9 7L4 17h5zM15 7l5 10h-5z"/>',
+  flipV: '<path d="M4 12h16" stroke-dasharray="2 2.5"/><path d="M7 9l10-5v5zM7 15l10 5v-5z"/>',
+  globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.4 3.6 5.2 3.6 8.5s-1 6.1-3.6 8.5c-2.6-2.4-3.6-5.2-3.6-8.5s1-6.1 3.6-8.5z"/>',
   sparkle: '<path d="M12 3.5l1.8 5.2 5.2 1.8-5.2 1.8L12 17.5l-1.8-5.2L5 10.5l5.2-1.8z"/><path d="M18.5 16.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/>',
 } as const;
 

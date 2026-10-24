@@ -17,31 +17,43 @@ Early work on top of the PhotoCraft base. Changes so far are listed in [CHANGES.
 <h4>🧰 67 tools</h4>
 Move · Artboard · Rectangular and Elliptical Marquee · Single Row Marquee · Single Column Marquee · Lasso · Polygonal Lasso · Magnetic Lasso · Object Selection · Quick Selection · Magic Wand · Crop · Perspective Crop · Slice · Slice Select · Frame · Eyedropper · Color Sampler · Ruler · Note · Count · Remove · Spot Healing Brush · Healing Brush · Patch · Content-Aware Move · Red Eye · Brush · Pencil · Mixer Brush · Color Replacement · Clone Stamp · Pattern Stamp · History Brush · Eraser · Background Eraser · Magic Eraser · Gradient · Paint Bucket · Blur · Sharpen · Smudge · Dodge · Burn · Sponge · Pen · Freeform Pen · Curvature Pen · Add Anchor Point · Delete Anchor Point · Convert Point · Horizontal and Vertical Type · Horizontal and Vertical Type Mask · Path Selection · Direct Selection · Rectangle · Ellipse · Triangle · Polygon · Line · Custom Shape · Hand · Rotate View · Zoom
 
-## The new interface (TypeScript)
+## How it is built
 
-PhotoDesign has its own interface, written in TypeScript in [`web/`](web/) and hosted in an
-Electron window in [`desktop/`](desktop/). It is not a copy of Photoshop's layout: a floating tool
-capsule, a single inspector card with Layers / Adjust / History, a command finder (Ctrl+K) over all
-935 engine actions, and a start screen with size presets. The editing engine stays Rust: the
-`apps/photodesign-wasm` crate exposes it to TypeScript as WebAssembly, and every edit is an engine
-command.
+| Part | Language | Where |
+| --- | --- | --- |
+| Interface: tools, panels, canvas, command finder, Thai and English | TypeScript | [`web/`](web/) |
+| Desktop window | JavaScript (Electron) | [`desktop/`](desktop/) |
+| Editing engine: documents, layers, brushes, filters, file formats, history | Rust | `crates/` |
+| Bridge from the interface to the engine (WebAssembly) | Rust | [`apps/photodesign-wasm`](apps/photodesign-wasm) |
+| Command line and agent (MCP) server | Rust | `apps/photocraft-cli`, `crates/automation` |
+
+The interface is PhotoDesign's own design, not a copy of Photoshop's: a floating tool capsule, one
+inspector card with Layers / Adjust / Image / History, a command finder (Ctrl+K) over every engine
+action, a start screen with size presets, and a language switch (English, Thai). Every edit is an
+engine command, so anything the interface does a script or an AI agent can do too.
+
+The egui desktop interface inherited from PhotoCraft was removed; the engine did not depend on it.
+
+## Build and run
 
 ```
-cd web && npm install && npm run engine && npm run build   # engine (Rust to wasm) + interface
-cd ../desktop && npm install && npm start                   # the window
-cd ../web && npm test                                       # interface tests, including the real engine
+rustup target add wasm32-unknown-unknown
+cargo install wasm-bindgen-cli --version 0.2.129
+
+cd web
+npm install
+npm run engine      # Rust engine to WebAssembly
+npm run build       # the interface, into web/dist
+npm test            # interface tests, including the real engine
+
+cd ../desktop
+npm install
+npm start           # the window
 ```
 
-The native egui app (below) is still there and still builds.
-
-## Build
-
-```
-cargo run -p photocraft --release
-```
-
-The crate names still say `photocraft`; see `docs/development.md` for the full build, test and
-control-channel instructions inherited from the base.
+Engine tests: `cargo test -p photodesign-wasm`, or `cargo test --workspace`. The crates are still
+named `photocraft-*`; renaming them would touch nearly every file. See `docs/development.md` for the
+engine's own build and test notes (it predates the interface change, so skip its egui parts).
 
 ## Licence
 

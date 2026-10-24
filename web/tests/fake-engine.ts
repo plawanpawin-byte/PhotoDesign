@@ -19,7 +19,7 @@ export class FakeEngine implements EngineApi {
     this.rev++;
     switch (id) {
       case 'file.new':
-        this.doc = { name: String(params.name ?? 'Untitled-1'), path: null, width: Number(params.width), height: Number(params.height), mode: 'Rgb', depth: 8, resolution: 72, activeLayer: 1, selectedLayers: [1], hasSelection: false, layers: [{ id: 1, name: 'Background', kind: 'Pixel', visible: true, opacity: 1, fill: 1, blend: 'Normal', clipped: false, hasMask: false, selected: true, bounds: null }], history: ['New'], canUndo: false, canRedo: false, revision: this.rev };
+        this.doc = { name: String(params.name ?? 'Untitled-1'), path: null, width: Number(params.width), height: Number(params.height), mode: 'Rgb', depth: 8, resolution: 72, activeLayer: 1, selectedLayers: [1], hasSelection: false, selectionBounds: null, layers: [{ id: 1, name: 'Background', kind: 'Pixel', visible: true, opacity: 1, fill: 1, blend: 'Normal', clipped: false, hasMask: false, selected: true, bounds: null }], history: ['New'], canUndo: false, canRedo: false, revision: this.rev };
         return { document: 0 };
       case 'layer.new.layer':
         if (!this.doc) throw new Error('no document');

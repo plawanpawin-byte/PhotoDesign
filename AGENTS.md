@@ -1,3 +1,9 @@
+> **PhotoDesign differences (read first).** This repository started as PhotoCraft 0.15.1. The
+> interface is no longer egui: it is TypeScript in `web/`, hosted by Electron in `desktop/`, over the
+> Rust engine compiled to WebAssembly by `apps/photodesign-wasm`. Where the text below says "Rust only",
+> "no Electron" or describes `crates/ui-egui`, `apps/photocraft` or `apps/photocraft-web`, that no longer
+> applies: those were removed. The engine rules (commands, never crash, no format assumptions) still do.
+
 # AGENTS.md: guide for AI agents and contributors
 
 PhotoCraft is an open-source, native, Photoshop-comparable image editor written in **Rust only** (no JavaScript or TypeScript). **No Tauri, Electron or webview shells:** the desktop app is native egui/eframe on wgpu, and the web build is the same Rust compiled to WebAssembly (trunk + wasm-bindgen). Never add Tauri (or any webview/JS UI framework) as a dependency, build step or packaging target. The product name is always written **PhotoCraft** (`{Function}Craft` in PascalCase, like its siblings ArtCraft, ArtCraftX, DesignCraft, VectorCraft, EffectCraft, FilmCraft, LightCraft, PdfCraft) in user-facing text: UI, window titles, About, installers, release names, docs prose. Machine names stay lowercase: crates (`photocraft-*`), binaries, file names, ids (`ai.storyteller.photocraft`). Standards and learnings shared across the crafting apps live in `../craftrules` (read its `README.md`; the repository is not public — outside contributors should ask a maintainer for the standards relevant to their change). Contribute reusable learnings there; shared Rust components live in [storytold/craft-libs](https://github.com/storytold/craft-libs) and are pinned by immutable git revision. UI libraries stay at L6. The goal is 1:1 Photoshop parity (same menus, shortcuts, behaviour and file fidelity) with better performance, and every feature drivable by agents. Read this file first, then `docs/`.

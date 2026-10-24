@@ -5,7 +5,6 @@
 
 mod corpus;
 mod corpus_pins;
-mod i18n_coverage;
 mod ico;
 mod layers;
 mod perf;
@@ -28,7 +27,7 @@ commands:
   test            workspace tests (cargo nextest when installed, else cargo test), then doctests
   ci              the CI gate: fmt --check, clippy -D warnings, layers, scorecard --check, tests
                   (nextest --profile ci), panic_hunt, doctests and wasm, with --locked --features heif
-                  (stops at first failure), then the i18n-coverage report
+                  (stops at first failure)
   corpus [--all | --pngsuite | --psd | --psd-tools | --pixls | --atn | --photoshop | --gimp] [--local] [--update-manifest]
                   show where test corpora live and their pins (xtask/src/corpus_pins.rs), or fetch
                   them into corpus/ (pinned commits, sha256-verified; --all = every corpus but pixls,
@@ -39,9 +38,6 @@ commands:
                   --pixls (or -p raw) also fetches corpus/pixls and runs the raw corpus tests;
                   --local takes corpus/photoshop and corpus/gimp from the photocraft-corpus authoring clone
   stats [--exact] count tests and lines per crate (--exact: ask the test harness via `-- --list`)
-  parity          Photoshop menu parity; rewrites docs/parity-checklist.md
-  i18n-coverage   report UI translation coverage and the missing strings per registered language
-                  (the last `ci` step; it never fails)
   perf [--quick] [--update-baseline] [--threshold PCT] [--bench NAME]... [--skip-build] [--reuse]
                   run the release benches, merge them by scenario id into target/perf/results.json,
                   check perf/budgets.toml and perf/baseline.json (non-zero on a broken budget or regression)
@@ -64,8 +60,6 @@ fn main() -> ExitCode {
         Some("corpus") => corpus::cmd(&rest),
         Some("test-corpus") => corpus::test_cmd(&rest),
         Some("stats") => stats::run(&root(), rest.contains(&"--exact")),
-        Some("parity") => cmd_parity(),
-        Some("i18n-coverage") => i18n_coverage::run(&root()),
         Some("perf") => perf::run(&root(), &rest),
         Some("scorecard") => scorecard::run(&root(), &rest),
         Some("version") => version::run(&root(), &rest),
@@ -151,7 +145,7 @@ fn wasm_set() -> Result<Vec<String>, String> {
     Ok(crates
         .into_iter()
         .filter(|c| match layers::classify(&c.name) {
-            Some(layers::Class::Layer(l)) => l <= 5 || layers::short_name(&c.name) == "ui-egui",
+            Some(layers::Class::Layer(l)) => l <= 5,
             Some(layers::Class::Standalone) => true,
             _ => false,
         })
@@ -249,12 +243,6 @@ fn cmd_doctest() -> Result<(), String> {
     run(c, "cargo test --workspace --doc")
 }
 
-fn cmd_parity() -> Result<(), String> {
-    let mut c = cargo();
-    c.args(["run", "-q", "-p", "photocraft-ui-egui", "--example", "parity", "--", "--write", "docs/parity-checklist.md"]);
-    run(c, "cargo run -p photocraft-ui-egui --example parity")
-}
-
 fn cmd_ci() -> Result<(), String> {
     type Step = (&'static str, Box<dyn Fn() -> Result<(), String>>);
     let steps: Vec<Step> = vec![
@@ -287,16 +275,6 @@ fn cmd_ci() -> Result<(), String> {
             }),
         ),
         ("wasm", Box::new(cmd_wasm)),
-        (
-            "i18n",
-            Box::new(|| {
-                // Lists missing translations for the log; a missing string shows in English, so it never fails CI.
-                if let Err(e) = i18n_coverage::run(&root()) {
-                    eprintln!("warning: i18n coverage report failed: {e}");
-                }
-                Ok(())
-            }),
-        ),
     ];
     let mut done = Vec::new();
     for (name, f) in &steps {

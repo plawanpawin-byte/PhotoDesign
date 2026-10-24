@@ -3,6 +3,7 @@
 import type { App, NewDocumentSpec } from '../app';
 import type { CommandInfo } from '../engine/types';
 import { rank } from '../lib/fuzzy';
+import { t } from '../lib/i18n';
 import { buildMenuTree, type MenuNode } from '../lib/menu-tree';
 import { clear, h, icon } from './dom';
 import { ICONS } from './icons';
@@ -33,17 +34,17 @@ export function welcome(app: App, openPicker: () => void, openNew: () => void): 
     const ratio = p.width / p.height;
     const shape = h('span.preset-shape', { style: { aspectRatio: String(ratio), [ratio >= 1 ? 'width' : 'height']: '44px' } });
     return h('button.preset', { onclick: () => app.newDocument({ width: p.width, height: p.height, name: p.name, resolution: p.resolution ?? 72 }) },
-      h('span.preset-frame', shape), h('span.preset-name', p.name), h('span.preset-size', `${p.width} × ${p.height}`), h('span.preset-note', p.note));
+      h('span.preset-frame', shape), h('span.preset-name', t(p.name)), h('span.preset-size', `${p.width} × ${p.height}`), h('span.preset-note', t(p.note)));
   });
   el.append(
     h('div.welcome-card',
-      h('div.welcome-head', icon(ICONS.logo, 34), h('div', h('h1', 'Photo', h('b', 'Design')), h('p', 'Edit photos, paint and compose — free and open source.'))),
+      h('div.welcome-head', icon(ICONS.logo, 34), h('div', h('h1', 'Photo', h('b', 'Design')), h('p', t('Edit photos, paint and compose — free and open source.')))),
       h('div.welcome-actions',
-        h('button.primary-btn.large', { onclick: openPicker }, icon(ICONS.open, 18), 'Open an image'),
-        h('button.ghost-btn.large', { onclick: openNew }, icon(ICONS.plus, 18), 'Custom size…')),
-      h('p.section-label', 'Start blank'),
+        h('button.primary-btn.large', { onclick: openPicker }, icon(ICONS.open, 18), t('Open an image')),
+        h('button.ghost-btn.large', { onclick: openNew }, icon(ICONS.plus, 18), t('Custom size…'))),
+      h('p.section-label', t('Start blank')),
       h('div.preset-grid', cards),
-      h('div.drop-hint', icon(ICONS.image, 16), 'Or drop a PNG, JPEG, WebP, TIFF, PSD or camera raw file anywhere.'),
+      h('div.drop-hint', icon(ICONS.image, 16), t('Or drop a PNG, JPEG, WebP, TIFF, PSD or camera raw file anywhere.')),
     ),
   );
   app.on('state', render);
@@ -67,28 +68,28 @@ export function newDocumentDialog(app: App, close: () => void): HTMLElement {
     const input = h('input', { type: 'number', min, max, value: String(value), 'aria-label': label }) as HTMLInputElement;
     return { input, row: h('label.field', h('span', label), input) };
   };
-  const name = h('input', { type: 'text', value: 'Untitled', 'aria-label': 'Name' }) as HTMLInputElement;
-  const w = num('Width (px)', 1920, 1, 300000);
-  const ht = num('Height (px)', 1080, 1, 300000);
-  const res = num('Resolution (ppi)', 72, 1, 30000);
-  const bg = h('select', { 'aria-label': 'Background' }, h('option', { value: 'white' }, 'White'), h('option', { value: 'black' }, 'Black'), h('option', { value: 'transparent' }, 'Transparent')) as HTMLSelectElement;
+  const name = h('input', { type: 'text', value: 'Untitled', 'aria-label': t('Name') }) as HTMLInputElement;
+  const w = num(t('Width (px)'), 1920, 1, 300000);
+  const ht = num(t('Height (px)'), 1080, 1, 300000);
+  const res = num(t('Resolution (ppi)'), 72, 1, 30000);
+  const bg = h('select', { 'aria-label': t('Background') }, h('option', { value: 'white' }, t('White')), h('option', { value: 'black' }, t('Black')), h('option', { value: 'transparent' }, t('Transparent'))) as HTMLSelectElement;
   const error = h('p.form-error');
   const create = () => {
     const spec: NewDocumentSpec = { name: name.value.trim() || 'Untitled', width: Math.round(Number(w.input.value)), height: Math.round(Number(ht.input.value)), resolution: Number(res.input.value), background: bg.value as NewDocumentSpec['background'] };
     if (!(spec.width >= 1 && spec.height >= 1 && spec.width <= 300000 && spec.height <= 300000)) {
-      error.textContent = 'Width and height must be between 1 and 300,000 pixels.';
+      error.textContent = t('Width and height must be between 1 and 300,000 pixels.');
       return;
     }
     close();
     app.newDocument(spec);
   };
   const form = h('form.dialog', { onsubmit: (e: Event) => { e.preventDefault(); create(); } },
-    h('h2', 'New document'),
-    h('label.field', h('span', 'Name'), name),
+    h('h2', t('New document')),
+    h('label.field', h('span', t('Name')), name),
     h('div.field-row', w.row, ht.row),
-    h('div.field-row', res.row, h('label.field', h('span', 'Background'), bg)),
+    h('div.field-row', res.row, h('label.field', h('span', t('Background')), bg)),
     error,
-    h('div.dialog-actions', h('button.ghost-btn', { type: 'button', onclick: close }, 'Cancel'), h('button.primary-btn', { type: 'submit' }, 'Create')),
+    h('div.dialog-actions', h('button.ghost-btn', { type: 'button', onclick: close }, t('Cancel')), h('button.primary-btn', { type: 'submit' }, t('Create'))),
   );
   const el = modal(close, form);
   queueMicrotask(() => name.select());
@@ -97,7 +98,7 @@ export function newDocumentDialog(app: App, close: () => void): HTMLElement {
 
 /** Search every engine command by name, menu or id, and run it. */
 export function commandPalette(app: App, close: () => void): HTMLElement {
-  const input = h('input.palette-input', { type: 'search', placeholder: 'Find an action — try “blur”, “rotate”, “new layer”', 'aria-label': 'Find an action' }) as HTMLInputElement;
+  const input = h('input.palette-input', { type: 'search', placeholder: t('Find an action — try “blur”, “rotate”, “new layer”'), 'aria-label': t('Find an action…') }) as HTMLInputElement;
   const list = h('ul.palette-list', { role: 'listbox' });
   const commands = app.commands();
   let results: CommandInfo[] = [];
@@ -107,10 +108,10 @@ export function commandPalette(app: App, close: () => void): HTMLElement {
     if (!c) return;
     close();
     if (!c.enabled) {
-      app.notify(c.disabledReason ? `${c.label.replace('…', '')}: ${c.disabledReason}` : `${c.label} is not available right now`, 'error');
+      app.notify(c.disabledReason ? `${c.label.replace('…', '')}: ${c.disabledReason}` : `${c.label} ${t('is not available right now')}`, 'error');
       return;
     }
-    if (app.run(c.id) !== undefined) app.notify(`${c.label.replace('…', '')} done`);
+    if (app.run(c.id) !== undefined) app.notify(`${c.label.replace('…', '')} ${t('done')}`);
   };
   const render = () => {
     const q = input.value;
@@ -124,7 +125,7 @@ export function commandPalette(app: App, close: () => void): HTMLElement {
         c.shortcut ? h('kbd', c.shortcut.replace('Cmd', 'Ctrl')) : null);
       list.append(row);
     });
-    if (!results.length) list.append(h('li.palette-empty', 'No matching action'));
+    if (!results.length) list.append(h('li.palette-empty', t('No matching action')));
   };
   const mark = () => {
     [...list.children].forEach((el, i) => el.classList.toggle('active', i === index));
@@ -140,7 +141,7 @@ export function commandPalette(app: App, close: () => void): HTMLElement {
     else if (e.key === 'Enter') { run(results[index]); e.preventDefault(); }
   });
   render();
-  const el = modal(close, h('div.palette', h('div.palette-head', icon(ICONS.search, 16), input, h('kbd', 'Esc')), list, h('div.palette-foot', `${commands.length} actions from the engine · ↑↓ to move · Enter to run`)));
+  const el = modal(close, h('div.palette', h('div.palette-head', icon(ICONS.search, 16), input, h('kbd', 'Esc')), list, h('div.palette-foot', `${commands.length} ${t('actions from the engine · ↑↓ to move · Enter to run')}`)));
   queueMicrotask(() => input.focus());
   return el;
 }

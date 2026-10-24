@@ -26,6 +26,8 @@ export interface DocumentInfo {
   activeLayer: number | null;
   selectedLayers: number[];
   hasSelection: boolean;
+  /** [x, y, width, height] of the selection in document pixels. */
+  selectionBounds: [number, number, number, number] | null;
   layers: LayerInfo[];
   /** Labels, oldest first; the last one is the current state. */
   history: string[];

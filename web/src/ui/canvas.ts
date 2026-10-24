@@ -1,6 +1,6 @@
 // The canvas: shows the engine's render of the active document, and turns pointer input into
 // engine commands for the tool in hand.
-import type { App } from '../app';
+import type { App, Rect } from '../app';
 import { bytesToHex, toHex } from '../lib/color';
 import { pan, stepZoom, toDoc, toScreen, zoomAt, type Point } from '../lib/viewport';
 import { toolDef, type ToolId } from '../tools/tools';
@@ -8,11 +8,27 @@ import { h } from './dom';
 
 /** Longest side the engine renders for the screen; larger documents are shown scaled. */
 const RENDER_MAX = 4096;
+/** A drag shorter than this (screen pixels) counts as a click. */
+const CLICK_SLOP = 3;
 
 interface Stroke {
   points: number[][];
   screen: Point[];
   erase: boolean;
+}
+
+/** A drag that builds a shape: a rectangle, a lasso path or a gradient line. */
+interface Drag {
+  tool: ToolId;
+  startScreen: Point;
+  start: Point;
+  end: Point;
+  path: Point[];
+}
+
+/** The rectangle between two document points, normalised to positive size. */
+export function rectBetween(a: Point, b: Point): Rect {
+  return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), width: Math.abs(a.x - b.x), height: Math.abs(a.y - b.y) };
 }
 
 export function canvasView(app: App): HTMLElement {
@@ -24,9 +40,12 @@ export function canvasView(app: App): HTMLElement {
   let renderedDoc = -1;
   let pointer: Point | null = null;
   let stroke: Stroke | null = null;
+  let drag: Drag | null = null;
   let panning: { from: Point; pointerId: number; button: number } | null = null;
   let queued = false;
   let checker: CanvasPattern | null = null;
+  let ants = 0;
+  let antsTimer = 0;
 
   const schedule = () => {
     if (queued) return;
@@ -103,7 +122,14 @@ export function canvasView(app: App): HTMLElement {
       ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(image, v.x, v.y, w, hgt);
     }
+    if (doc.selectionBounds) {
+      const [sx, sy, sw, sh] = doc.selectionBounds;
+      const a = toScreen(v, { x: sx, y: sy });
+      outline(ctx, a.x, a.y, sw * v.zoom, sh * v.zoom, ants);
+    }
+    if (app.cropRect) drawCrop(ctx, app, app.cropRect);
     if (stroke && stroke.screen.length) drawStrokePreview(ctx, stroke, app);
+    if (drag) drawDrag(ctx, drag, app);
     const tool = app.tools.active;
     if (pointer && (tool === 'brush' || tool === 'eraser') && !panning) {
       const r = Math.max(1, (app.brush.size * v.zoom) / 2);
@@ -127,14 +153,26 @@ export function canvasView(app: App): HTMLElement {
   const updateCursor = () => {
     const tool = app.tools.active;
     if (panning) canvas.style.cursor = 'grabbing';
-    else if (tool === 'zoom') canvas.style.cursor = 'zoom-in';
     else canvas.style.cursor = toolDef(tool).cursor;
+  };
+
+  const capture = (e: PointerEvent) => {
+    try {
+      canvas.setPointerCapture?.(e.pointerId);
+    } catch {
+      // a synthetic pointer has nothing to capture
+    }
   };
 
   const startPan = (e: PointerEvent) => {
     panning = { from: local(e), pointerId: e.pointerId, button: e.button };
-    canvas.setPointerCapture(e.pointerId);
+    capture(e);
     updateCursor();
+  };
+
+  const clampToDoc = (d: Point): Point => {
+    const doc = app.doc;
+    return doc ? { x: Math.min(doc.width, Math.max(0, d.x)), y: Math.min(doc.height, Math.max(0, d.y)) } : d;
   };
 
   canvas.addEventListener('pointerdown', (e) => {
@@ -152,13 +190,20 @@ export function canvasView(app: App): HTMLElement {
     if (tool === 'zoom') {
       app.setView(zoomAt(app.view, stepZoom(app.view.zoom, e.altKey ? -1 : 1), p));
     } else if (tool === 'brush' || tool === 'eraser') {
-      canvas.setPointerCapture(e.pointerId);
+      capture(e);
       stroke = { points: [], screen: [], erase: tool === 'eraser' };
       addPoint(stroke, d, p, e);
     } else if (tool === 'fill') {
       app.run('paint.bucket', { x: Math.floor(d.x), y: Math.floor(d.y), tolerance: app.fill.tolerance, contiguous: app.fill.contiguous });
     } else if (tool === 'eyedropper') {
       pick(app, d);
+    } else if (tool === 'wand') {
+      app.run('select.magicWand', { x: Math.floor(d.x), y: Math.floor(d.y), tolerance: app.fill.tolerance, contiguous: app.fill.contiguous, mode: app.select.mode });
+    } else if (tool === 'marquee' || tool === 'ellipse' || tool === 'crop' || tool === 'gradient' || tool === 'lasso') {
+      capture(e);
+      const c = tool === 'gradient' || tool === 'lasso' ? d : clampToDoc(d);
+      drag = { tool, startScreen: p, start: c, end: c, path: [c] };
+      if (tool === 'crop') app.setCrop(null);
     }
     schedule();
   });
@@ -177,17 +222,49 @@ export function canvasView(app: App): HTMLElement {
         const cp = local(ce);
         addPoint(stroke, toDoc(app.view, cp), cp, ce);
       }
+    } else if (drag) {
+      const d = toDoc(app.view, p);
+      drag.end = drag.tool === 'gradient' || drag.tool === 'lasso' ? d : clampToDoc(d);
+      if (drag.tool === 'lasso') drag.path.push(drag.end);
     } else if (app.tools.active === 'eyedropper' && e.buttons === 1) {
       pick(app, toDoc(app.view, p));
     }
     schedule();
   });
 
+  const finishDrag = (e: PointerEvent) => {
+    const dr = drag;
+    drag = null;
+    if (!dr) return;
+    const moved = Math.hypot(local(e).x - dr.startScreen.x, local(e).y - dr.startScreen.y) > CLICK_SLOP;
+    const rect = rectBetween(dr.start, dr.end);
+    switch (dr.tool) {
+      case 'marquee':
+      case 'ellipse':
+        if (!moved || rect.width < 1 || rect.height < 1) {
+          if (app.doc?.hasSelection) app.run('select.deselect');
+        } else app.selectRect(rect, dr.tool === 'ellipse');
+        break;
+      case 'lasso':
+        if (moved && dr.path.length >= 3) app.run('select.lasso', { points: dr.path.map((q) => [Math.round(q.x), Math.round(q.y)]), mode: app.select.mode, feather: app.select.feather });
+        break;
+      case 'crop':
+        app.setCrop(moved && rect.width >= 1 && rect.height >= 1 ? rect : null);
+        break;
+      case 'gradient':
+        if (moved) app.run('paint.gradient', { from: [dr.start.x, dr.start.y], to: [dr.end.x, dr.end.y], style: app.gradientStyle, colors: [app.foreground, app.background] });
+        break;
+      default:
+        break;
+    }
+  };
+
   const finish = (e: PointerEvent) => {
     if (panning && e.pointerId === panning.pointerId) {
       panning = null;
       updateCursor();
     }
+    finishDrag(e);
     if (stroke) {
       const s = stroke;
       stroke = null;
@@ -205,9 +282,12 @@ export function canvasView(app: App): HTMLElement {
     schedule();
   };
   canvas.addEventListener('pointerup', finish);
-  canvas.addEventListener('pointercancel', finish);
+  canvas.addEventListener('pointercancel', (e) => {
+    drag = null;
+    finish(e);
+  });
   canvas.addEventListener('pointerleave', () => {
-    if (!stroke && !panning) {
+    if (!stroke && !panning && !drag) {
       pointer = null;
       schedule();
     }
@@ -233,6 +313,7 @@ export function canvasView(app: App): HTMLElement {
   );
 
   const resize = () => {
+    if (!stage.isConnected) return;
     const r = stage.getBoundingClientRect();
     if (r.width > 0 && r.height > 0) app.setViewport({ width: Math.round(r.width), height: Math.round(r.height) });
   };
@@ -243,15 +324,128 @@ export function canvasView(app: App): HTMLElement {
     app.fitView();
   });
 
-  app.on('state', schedule);
+  // The selection outline's dashes crawl, but only while there is a selection to show.
+  const animate = () => {
+    window.clearInterval(antsTimer);
+    if (app.doc?.selectionBounds) {
+      antsTimer = window.setInterval(() => {
+        if (!stage.isConnected) {
+          window.clearInterval(antsTimer);
+          return;
+        }
+        ants = (ants + 1) % 16;
+        schedule();
+      }, 120);
+    }
+  };
+  app.on('state', () => {
+    animate();
+    schedule();
+  });
   app.on('view', schedule);
   app.on('settings', schedule);
+  app.on('crop', schedule);
   app.on('tool', () => {
     updateCursor();
     schedule();
   });
   updateCursor();
   return stage;
+}
+
+function outline(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, offset: number) {
+  ctx.save();
+  ctx.lineWidth = 1;
+  ctx.setLineDash([5, 4]);
+  ctx.strokeStyle = '#000';
+  ctx.lineDashOffset = offset;
+  ctx.strokeRect(x + 0.5, y + 0.5, w, h);
+  ctx.strokeStyle = '#fff';
+  ctx.lineDashOffset = offset + 4.5;
+  ctx.strokeRect(x + 0.5, y + 0.5, w, h);
+  ctx.restore();
+}
+
+function drawCrop(ctx: CanvasRenderingContext2D, app: App, r: Rect) {
+  const a = toScreen(app.view, { x: r.x, y: r.y });
+  const w = r.width * app.view.zoom;
+  const hgt = r.height * app.view.zoom;
+  const doc = app.doc!;
+  const tl = toScreen(app.view, { x: 0, y: 0 });
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.beginPath();
+  ctx.rect(tl.x, tl.y, doc.width * app.view.zoom, doc.height * app.view.zoom);
+  ctx.rect(a.x, a.y, w, hgt);
+  ctx.fill('evenodd');
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(a.x, a.y, w, hgt);
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (const f of [1 / 3, 2 / 3]) {
+    ctx.moveTo(a.x + w * f, a.y);
+    ctx.lineTo(a.x + w * f, a.y + hgt);
+    ctx.moveTo(a.x, a.y + hgt * f);
+    ctx.lineTo(a.x + w, a.y + hgt * f);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawDrag(ctx: CanvasRenderingContext2D, d: Drag, app: App) {
+  const v = app.view;
+  if (d.tool === 'marquee' || d.tool === 'ellipse' || d.tool === 'crop') {
+    const r = rectBetween(d.start, d.end);
+    const a = toScreen(v, { x: r.x, y: r.y });
+    if (d.tool === 'ellipse') {
+      ctx.save();
+      ctx.setLineDash([5, 4]);
+      ctx.strokeStyle = '#fff';
+      ctx.shadowColor = '#000';
+      ctx.shadowBlur = 1;
+      ctx.beginPath();
+      ctx.ellipse(a.x + (r.width * v.zoom) / 2, a.y + (r.height * v.zoom) / 2, (r.width * v.zoom) / 2, (r.height * v.zoom) / 2, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    } else if (d.tool === 'crop') drawCrop(ctx, app, r);
+    else outline(ctx, a.x, a.y, r.width * v.zoom, r.height * v.zoom, 0);
+  } else if (d.tool === 'lasso') {
+    ctx.save();
+    ctx.setLineDash([5, 4]);
+    ctx.strokeStyle = '#fff';
+    ctx.shadowColor = '#000';
+    ctx.shadowBlur = 1;
+    ctx.beginPath();
+    d.path.forEach((q, i) => {
+      const s = toScreen(v, q);
+      if (i) ctx.lineTo(s.x, s.y);
+      else ctx.moveTo(s.x, s.y);
+    });
+    ctx.stroke();
+    ctx.restore();
+  } else if (d.tool === 'gradient') {
+    const a = toScreen(v, d.start);
+    const b = toScreen(v, d.end);
+    ctx.save();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#fff';
+    ctx.shadowColor = '#000';
+    ctx.shadowBlur = 2;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    for (const [pt, color] of [[a, app.foreground], [b, app.background]] as const) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
 }
 
 function addPoint(stroke: Stroke, d: Point, screen: Point, e: PointerEvent) {
@@ -309,12 +503,4 @@ function makeChecker(ctx: CanvasRenderingContext2D): CanvasPattern | null {
   t.fillRect(0, 0, 8, 8);
   t.fillRect(8, 8, 8, 8);
   return ctx.createPattern(tile, 'repeat');
-}
-
-/** Screen rectangle of the document (for tests and overlays). */
-export function documentRect(app: App): { x: number; y: number; width: number; height: number } | null {
-  const doc = app.doc;
-  if (!doc) return null;
-  const tl = toScreen(app.view, { x: 0, y: 0 });
-  return { x: tl.x, y: tl.y, width: doc.width * app.view.zoom, height: doc.height * app.view.zoom };
 }
