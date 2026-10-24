@@ -221,25 +221,34 @@ impl Tokens {
 
     pub fn for_kind(kind: ThemeKind) -> Self {
         match kind {
-            // Sampled from Photoshop 2026's default brightness (raw display values).
+            // PhotoDesign's default: the Lunatic Design dark palette (#404040 bars and toolbox,
+            // #363636 panels and tab strips, #1f1f1f docks, #222 canvas surround, #161616 fields)
+            // on the Photoshop-grammar layout. Lunatic's blue (#2d8cf0 selection, #4a86e8 brand).
             ThemeKind::ProMedium => Tokens {
                 kind,
-                chrome: Color32::from_rgb(83, 83, 83),
-                dock: Color32::from_rgb(66, 66, 66),
-                card: Color32::from_rgb(83, 83, 83),
-                card_border: Color32::from_rgb(66, 66, 66),
-                field: Color32::from_rgb(69, 69, 69),
-                field_border: Color32::from_rgb(104, 104, 104),
-                hover: Color32::from_rgb(98, 98, 98),
-                pressed: Color32::from_rgb(112, 112, 112),
-                text: Color32::from_rgb(238, 238, 238),
-                text_dim: Color32::from_rgb(212, 212, 212),
-                text_faint: Color32::from_rgb(160, 160, 160),
-                icon: Color32::from_rgb(226, 226, 226),
-                accent_soft: Color32::from_rgb(110, 110, 110),
-                separator: Color32::from_rgb(62, 62, 62),
-                tab_strip: Color32::from_rgb(74, 74, 74),
-                row_selected: Color32::from_rgb(107, 107, 107),
+                chrome: Color32::from_rgb(64, 64, 64),
+                canvas: Color32::from_rgb(34, 34, 34),
+                canvas_dot: Color32::from_rgb(34, 34, 34),
+                dock: Color32::from_rgb(31, 31, 31),
+                card: Color32::from_rgb(54, 54, 54),
+                card_border: Color32::from_rgb(22, 22, 22),
+                field: Color32::from_rgb(22, 22, 22),
+                field_border: Color32::from_rgb(64, 64, 64),
+                hover: Color32::from_rgb(77, 77, 77),
+                pressed: Color32::from_rgb(90, 90, 90),
+                text: Color32::from_rgb(255, 255, 255),
+                text_dim: Color32::from_rgb(217, 217, 217),
+                text_faint: Color32::from_rgb(154, 154, 154),
+                icon: Color32::from_rgb(217, 217, 217),
+                accent: Color32::from_rgb(45, 140, 240),
+                accent_soft: Color32::from_rgb(36, 64, 106),
+                accent_border: Color32::from_rgb(74, 134, 232),
+                accent_text: Color32::from_rgb(156, 195, 255),
+                separator: Color32::from_rgb(22, 22, 22),
+                tab_strip: Color32::from_rgb(54, 54, 54),
+                row_selected: Color32::from_rgb(74, 74, 74),
+                primary_bg: Color32::from_rgb(74, 134, 232),
+                histogram_bg: Color32::from_rgb(22, 22, 22),
                 ..Tokens::for_kind(ThemeKind::Pro)
             },
             // Photoshop's medium-light brightness: #B8B8B8 panels, dark text, a mid-grey canvas.
@@ -1229,7 +1238,7 @@ mod tests {
         assert_eq!(ThemeKind::from_name("Solarized Dark"), Some(ThemeKind::SolarizedDark));
         assert_eq!(ThemeKind::from_name("solarized"), Some(ThemeKind::SolarizedDark));
         let m = Tokens::for_kind(ThemeKind::ProMedium);
-        assert!(m.pro && m.dark() && m.kind == ThemeKind::ProMedium && m.card == Color32::from_rgb(83, 83, 83));
+        assert!(m.pro && m.dark() && m.kind == ThemeKind::ProMedium && m.card == Color32::from_rgb(54, 54, 54));
         let s = Tokens::for_kind(ThemeKind::SolarizedDark);
         assert!(s.dark() && !s.bevel && s.kind == ThemeKind::SolarizedDark && s.card == Color32::from_rgb(7, 54, 66));
         assert_eq!(ThemeKind::from_name("neon"), None);
