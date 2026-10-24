@@ -277,3 +277,12 @@ input[type='checkbox'] { accent-color: var(--brand); }
 .panel-body .field input:focus { outline-width: 1px; }
 .dock-grip { position: absolute; left: -3px; top: 0; bottom: 0; width: 6px; z-index: 5; cursor: ew-resize; }
 .dock-grip:hover { background: rgba(74, 134, 232, 0.35); }
+/* Grid cells may shrink below a slider's built-in width, so nothing pushes past the panel edge. */
+.prop-row > * { min-width: 0; }
+.prop-row input[type='range'] { width: 100%; }
+.panel-body { overflow-x: hidden; }
+/* Thin scrollbars that match the panels (Windows draws wide ones otherwise). */
+* { scrollbar-width: thin; scrollbar-color: #4a4a4a transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #4a4a4a; border-radius: 4px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
