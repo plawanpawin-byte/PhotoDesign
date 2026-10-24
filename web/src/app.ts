@@ -5,6 +5,7 @@ import { t } from './lib/i18n';
 import type { CommandInfo, DocumentInfo, EngineApi, EngineState, LayerInfo } from './engine/types';
 import { toHex } from './lib/color';
 import { fit, type Size, type View } from './lib/viewport';
+import type { PreviewFn } from './imaging/preview';
 import { ToolHand } from './tools/tools';
 
 export interface BrushSettings {
@@ -19,7 +20,7 @@ export interface FillSettings {
   contiguous: boolean;
 }
 
-export type Topic = 'state' | 'view' | 'tool' | 'settings' | 'toast' | 'crop';
+export type Topic = 'state' | 'view' | 'tool' | 'settings' | 'toast' | 'crop' | 'preview';
 
 export type SelectMode = 'replace' | 'add' | 'subtract' | 'intersect';
 
@@ -65,6 +66,8 @@ export class App {
   /** The crop being drawn, in document pixels, until it is applied or cancelled. */
   cropRect: Rect | null = null;
   toasts: Toast[] = [];
+  /** A live, not yet applied, adjustment shown on the canvas. */
+  preview: PreviewFn | null = null;
   private commandCache: CommandInfo[] | null = null;
   private listeners = new Map<Topic, Set<() => void>>();
   private toastSeq = 0;
@@ -120,6 +123,7 @@ export class App {
   run(id: string, params: Record<string, unknown> = {}): unknown {
     try {
       const result = this.engine.execute(id, params);
+      this.preview = null;
       this.refresh();
       return result;
     } catch (e) {
@@ -176,6 +180,12 @@ export class App {
   setGradientStyle(style: GradientStyle) {
     this.gradientStyle = style;
     this.emit('settings');
+  }
+
+  setPreview(fn: PreviewFn | null) {
+    if (!fn && !this.preview) return;
+    this.preview = fn;
+    this.emit('preview');
   }
 
   setCrop(rect: Rect | null) {

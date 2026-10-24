@@ -4,6 +4,8 @@ import { findLayer } from '../app';
 import type { LayerInfo } from '../engine/types';
 import { t } from '../lib/i18n';
 import { clear, h, icon } from './dom';
+import { histogram } from '../imaging/histogram';
+import { previewFor } from '../imaging/preview';
 import { ICONS } from './icons';
 
 type Tab = 'layers' | 'adjust' | 'image' | 'history';
@@ -22,6 +24,7 @@ export function inspector(app: App): HTMLElement {
     h('button.seg', { role: 'tab', title: t(TAB_LABEL[id]), dataset: { tab: id }, onclick: () => { tab = id; rememberedTab = id; render(); } },
       icon(TAB_ICON[id], 15), h('span', t(TAB_LABEL[id]))));
   const render = () => {
+    app.setPreview(null);
     for (const b of tabs) b.classList.toggle('active', b.dataset.tab === tab);
     clear(body);
     if (!app.doc) {
@@ -144,6 +147,34 @@ const QUICK: readonly [string, string][] = [
   ['image.adjustments.invert', 'Invert'],
 ];
 
+/** Draws the active layer's tone as a histogram, worked out in the browser from a small render. */
+function histogramView(app: App): HTMLElement {
+  const canvas = h('canvas.histogram', { width: 256, height: 64, 'aria-label': t('Histogram') }) as HTMLCanvasElement;
+  const draw = () => {
+    const ctx = canvas.getContext('2d');
+    if (!ctx || !app.doc) return;
+    ctx.clearRect(0, 0, 256, 64);
+    try {
+      const frame = app.engine.render(192);
+      const hist = histogram(frame.pixels);
+      const peak = Math.max(1, ...hist.luma.slice(1, 255));
+      ctx.globalCompositeOperation = 'lighter';
+      for (const [bins, color] of [[hist.r, '#f0506e'], [hist.g, '#46c882'], [hist.b, '#4a86e8']] as const) {
+        ctx.fillStyle = color;
+        for (let i = 0; i < 256; i++) {
+          const n = Math.min(64, (bins[i]! / peak) * 64);
+          ctx.globalAlpha = 0.55;
+          ctx.fillRect(i, 64 - n, 1, n);
+        }
+      }
+    } catch {
+      /* no render available: leave the graph empty */
+    }
+  };
+  queueMicrotask(draw);
+  return h('div.histogram-box', canvas);
+}
+
 function adjustView(app: App): HTMLElement {
   const quick = h('div.quick-row', QUICK.map(([id, label]) => h('button.chip-btn', { onclick: () => app.run(id) }, t(label))));
   const cards = ADJUST_GROUPS.map((g) => {
@@ -155,11 +186,13 @@ function adjustView(app: App): HTMLElement {
       input.addEventListener('input', () => {
         values[c.key] = Number(input.value);
         out.textContent = input.value;
+        app.setPreview(previewFor(g.command, { ...values }));
       });
       input.addEventListener('dblclick', () => {
         input.value = String(c.value);
         values[c.key] = c.value;
         out.textContent = String(c.value);
+        app.setPreview(previewFor(g.command, { ...values }));
       });
       return h('div.prop-row', h('span.prop-label', t(c.label)), input, out);
     });
@@ -169,7 +202,7 @@ function adjustView(app: App): HTMLElement {
       h('div.adjust-actions', h('button.primary-btn.small', { onclick: () => app.run(g.command, { ...values }) }, t('Apply to layer'))),
     );
   });
-  return h('div.adjust', h('p.section-label', icon(ICONS.sparkle, 13), t('One click')), quick, h('p.section-label', t('Fine tune')), cards, h('p.foot-note', t('Changes apply to the selected layer and can be undone.')));
+  return h('div.adjust', histogramView(app), h('p.section-label', icon(ICONS.sparkle, 13), t('One click')), quick, h('p.section-label', t('Fine tune')), cards, h('p.foot-note', t('Changes apply to the selected layer and can be undone.')));
 }
 
 function actionButton(app: App, iconName: keyof typeof ICONS, label: string, command: string, params: Record<string, unknown> = {}, enabled = true): HTMLElement {

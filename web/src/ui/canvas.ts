@@ -36,6 +36,10 @@ export function canvasView(app: App): HTMLElement {
   const stage = h('div.stage', canvas);
   const ctx = canvas.getContext('2d');
   let image: HTMLCanvasElement | null = null;
+  let base: ImageData | null = null;
+  let shown: HTMLCanvasElement | null = null;
+  let shownFor: unknown = null;
+  const tinted = document.createElement('canvas');
   let renderedRevision = Number.NaN;
   let renderedDoc = -1;
   let pointer: Point | null = null;
@@ -72,13 +76,30 @@ export function canvasView(app: App): HTMLElement {
       off.width = frame.width;
       off.height = frame.height;
       const c = off.getContext('2d');
-      if (c) c.putImageData(new ImageData(new Uint8ClampedArray(frame.pixels.buffer as ArrayBuffer, frame.pixels.byteOffset, frame.pixels.byteLength), frame.width, frame.height), 0, 0);
+      base = new ImageData(new Uint8ClampedArray(frame.pixels.buffer as ArrayBuffer, frame.pixels.byteOffset, frame.pixels.byteLength), frame.width, frame.height);
+      if (c) c.putImageData(base, 0, 0);
       image = off;
+      shownFor = null;
       renderedRevision = revision;
       renderedDoc = active;
     } catch (e) {
       app.notify(e instanceof Error ? e.message : String(e), 'error');
     }
+  };
+
+  /** The frame with the pending adjustment applied, or `null` when nothing is being previewed. */
+  const previewImage = (docWidth: number): HTMLCanvasElement | null => {
+    const fn = app.preview;
+    if (!fn || !base) return null;
+    if (shownFor === fn && shown) return shown;
+    const px = new Uint8ClampedArray(base.data);
+    fn(px, base.width, base.height, base.width / Math.max(1, docWidth));
+    tinted.width = base.width;
+    tinted.height = base.height;
+    tinted.getContext('2d')?.putImageData(new ImageData(px, base.width, base.height), 0, 0);
+    shown = tinted;
+    shownFor = fn;
+    return shown;
   };
 
   const draw = () => {
@@ -120,7 +141,7 @@ export function canvasView(app: App): HTMLElement {
     if (image) {
       ctx.imageSmoothingEnabled = v.zoom < 2;
       ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(image, v.x, v.y, w, hgt);
+      ctx.drawImage(previewImage(doc.width) ?? image, v.x, v.y, w, hgt);
     }
     if (doc.selectionBounds) {
       const [sx, sy, sw, sh] = doc.selectionBounds;
@@ -345,6 +366,7 @@ export function canvasView(app: App): HTMLElement {
   app.on('view', schedule);
   app.on('settings', schedule);
   app.on('crop', schedule);
+  app.on('preview', schedule);
   app.on('tool', () => {
     updateCursor();
     schedule();

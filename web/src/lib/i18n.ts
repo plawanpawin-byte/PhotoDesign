@@ -87,6 +87,7 @@ export const TH: Record<string, string> = {
   Deselect: 'ไม่เลือก',
   Invert: 'กลับสี',
   'Invert selection': 'กลับด้านการเลือก',
+  'Histogram': 'ฮิสโตแกรม',
   // zoom / status
   'Fit on screen (Ctrl+0)': 'พอดีหน้าจอ (Ctrl+0)',
   'Zoom out (Ctrl+-)': 'ย่อ (Ctrl+-)',
