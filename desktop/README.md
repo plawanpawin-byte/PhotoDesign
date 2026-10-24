@@ -34,3 +34,9 @@ installed app needs neither Rust nor Node.
 
 GitHub builds the same two files on every push (workflow "Desktop app"); download them from the
 run's artifacts. Pushing a `v*` tag also attaches them to a release.
+
+## AI agents (MCP)
+
+Claude, Codex, Cursor and other MCP clients can drive the open window: every tool, filter and
+command, opening and saving files. `npm run cli` builds the MCP server; then Help › Connect AI
+agents (MCP)… shows the configuration to paste. Details: [MCP.md](MCP.md).

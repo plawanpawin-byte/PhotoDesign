@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node run.mjs",
     "electron": "electron .",
-    "dist": "node dist.mjs"
+    "dist": "node dist.mjs",
+    "cli": "node build-cli.mjs"
   },
   "devDependencies": {
     "electron": "^33.0.0",
@@ -22,6 +23,8 @@
     },
     "files": [
       "main.cjs",
+      "control.cjs",
+      "preload.cjs",
       "icon.png",
       "icon.ico"
     ],
@@ -29,6 +32,10 @@
       {
         "from": "../web/dist",
         "to": "web"
+      },
+      {
+        "from": "bin",
+        "to": "bin"
       }
     ],
     "win": {

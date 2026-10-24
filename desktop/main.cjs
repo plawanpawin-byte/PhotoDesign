@@ -1,9 +1,10 @@
 // PhotoDesign's desktop window: serves the TypeScript interface (web/dist, with the Rust engine
 // as WebAssembly) on 127.0.0.1 and shows it. Nothing is reachable from other computers.
-const { app, BrowserWindow, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
+const { startControl } = require('./control.cjs');
 
 // Installed builds carry the interface in resources/web; from source it is web/dist.
 const dist = path.resolve(process.env.PHOTODESIGN_WEB_DIST || (app.isPackaged ? path.join(process.resourcesPath, 'web') : path.join(__dirname, '..', 'web', 'dist')));
@@ -53,6 +54,55 @@ function serve() {
   });
 }
 
+// AI agents (MCP) reach the window through the control channel; PHOTODESIGN_CONTROL=0 turns it off.
+function startAgents(win) {
+  if (process.env.PHOTODESIGN_CONTROL === '0') return;
+  const pending = new Map();
+  let seq = 0;
+  // Resolves once the page's handler is attached (the engine loads first, which takes a moment).
+  let markReady;
+  const ready = new Promise((resolve) => (markReady = resolve));
+  ipcMain.on('control:ready', (e) => {
+    if (e.sender !== win.webContents) return;
+    markReady();
+    // A reloaded page announces itself again; what the old page was asked is lost with it.
+    for (const p of pending.values()) p.reject(new Error('the PhotoDesign window reloaded; try again'));
+    pending.clear();
+  });
+  ipcMain.on('control:reply', (e, { id, ok, result, error }) => {
+    const p = pending.get(id);
+    if (!p || e.sender !== win.webContents) return;
+    pending.delete(id);
+    if (ok) p.resolve(result);
+    else p.reject(new Error(error));
+  });
+  const call = async (method, params) => {
+    let timer;
+    const starting = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error('PhotoDesign is still starting; try again in a moment')), 30_000);
+    });
+    await Promise.race([ready, starting]).finally(() => clearTimeout(timer));
+    if (win.isDestroyed()) throw new Error('the PhotoDesign window is closed');
+    return new Promise((resolve, reject) => {
+      const id = ++seq;
+      pending.set(id, { resolve, reject });
+      win.webContents.send('control:call', { id, method, params });
+    });
+  };
+  const root = path.resolve(process.env.PHOTODESIGN_AUTOMATION_ROOT || path.join(app.getPath('documents'), 'PhotoDesign'));
+  const exe = process.platform === 'win32' ? 'photodesign-cli.exe' : 'photodesign-cli';
+  const cli = app.isPackaged ? path.join(process.resourcesPath, 'bin', exe) : path.join(__dirname, 'bin', exe);
+  const started = startControl({ port: Number(process.env.PHOTODESIGN_CONTROL_PORT || 7878), root, window: () => (win.isDestroyed() ? null : win), call });
+  started.then(
+    (c) => console.log(`PhotoDesign control: 127.0.0.1:${c.port}, token file ${c.tokenFile}, files in ${c.root}`),
+    (e) => console.error(`PhotoDesign control channel not started: ${e.message}`),
+  );
+  ipcMain.handle('control:info', async () => {
+    const c = await started;
+    return { port: c.port, tokenFile: c.tokenFile, root: c.root, cli, cliFound: fs.existsSync(cli) };
+  });
+}
+
 app.whenReady().then(async () => {
   if (!fs.existsSync(path.join(dist, 'index.html'))) {
     const win = new BrowserWindow({ width: 760, height: 260, backgroundColor: '#222222' });
@@ -64,7 +114,16 @@ app.whenReady().then(async () => {
     return;
   }
   const server = await serve();
-  const win = new BrowserWindow({ width: 1440, height: 900, backgroundColor: '#222222', title: 'PhotoDesign', autoHideMenuBar: true, icon: path.join(__dirname, process.platform === 'win32' ? 'icon.ico' : 'icon.png') });
+  const win = new BrowserWindow({
+    width: 1440,
+    height: 900,
+    backgroundColor: '#222222',
+    title: 'PhotoDesign',
+    autoHideMenuBar: true,
+    icon: path.join(__dirname, process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
+    webPreferences: { preload: path.join(__dirname, 'preload.cjs') },
+  });
+  startAgents(win);
   win.setMenuBarVisibility(false);
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);

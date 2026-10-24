@@ -1,6 +1,7 @@
 import './styles/tokens.css';
 import './styles/app.css';
 import { App } from './app';
+import { attachControl } from './control';
 import { loadEngine } from './engine/client';
 import { initLang, onLangChange, t } from './lib/i18n';
 import { actionFor, isTyping, nextBrushSize } from './lib/keys';
@@ -10,7 +11,7 @@ import { canvasView } from './ui/canvas';
 import { docTabs, menuBar, statusLine, toasts, toolDock, toolOptions } from './ui/chrome';
 import { h } from './ui/dom';
 import { panelDock } from './ui/inspector';
-import { commandPalette, menuDropdown, newDocumentDialog, welcome } from './ui/overlays';
+import { agentsDialog, commandPalette, menuDropdown, newDocumentDialog, welcome, type AgentInfo } from './ui/overlays';
 
 const ACCEPT = '.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff,.psd,.psb,.pcraft,.exr,.hdr,.tga,.dng,.cr2,.cr3,.nef,.arw,.raf,.orf,.rw2,.heic,.heif,.qoi,.ico';
 
@@ -98,6 +99,10 @@ export function mount(root: HTMLElement, app: App): () => void {
   });
   on(window, 'keyup', (e) => app.tools.release(e.key));
   on(window, 'blur', () => app.tools.releaseAll());
+  on(document, 'photodesign:agents', () => {
+    const host = (window as unknown as { photodesignHost?: { info(): Promise<AgentInfo> } }).photodesignHost;
+    void (host ? host.info() : Promise.resolve(null)).then((info) => show(agentsDialog(info, closeOverlay)), () => show(agentsDialog(null, closeOverlay)));
+  });
 
   on(root, 'dragover', (e) => {
     if (e.dataTransfer?.types.includes('Files')) {
@@ -143,6 +148,7 @@ async function start() {
       app.fitView();
     });
     (window as unknown as { photodesign: App }).photodesign = app;
+    attachControl(app);
   } catch (e) {
     root.replaceChildren(h('div.boot-error', h('h1', t('PhotoDesign could not start')), h('p', e instanceof Error ? e.message : String(e)), h('p', t('Build the engine first: npm run engine'))));
   }

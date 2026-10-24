@@ -63,6 +63,43 @@ function modal(onClose: () => void, ...children: Node[]): HTMLElement {
   return backdrop;
 }
 
+/** Where the desktop host's control channel and MCP server are; null in a plain browser tab. */
+export interface AgentInfo {
+  port: number;
+  tokenFile: string;
+  root: string;
+  cli: string;
+  cliFound: boolean;
+}
+
+/** The MCP server's configuration for AI clients, ready to copy. */
+export function agentConfigs(info: AgentInfo): { name: string; text: string }[] {
+  const args = ['mcp', '--bridge', `127.0.0.1:${info.port}`, '--control-token-file', info.tokenFile];
+  const json = JSON.stringify({ mcpServers: { photodesign: { command: info.cli, args } } }, null, 2);
+  const quote = (s: string) => (/[\s"]/.test(s) ? JSON.stringify(s) : s);
+  return [
+    { name: 'Claude Desktop / Cursor / Antigravity (JSON)', text: json },
+    { name: 'Claude Code', text: `claude mcp add photodesign -- ${[info.cli, ...args].map(quote).join(' ')}` },
+    { name: 'Codex (~/.codex/config.toml)', text: `[mcp_servers.photodesign]\ncommand = ${JSON.stringify(info.cli)}\nargs = ${JSON.stringify(args)}` },
+  ];
+}
+
+export function agentsDialog(info: AgentInfo | null, close: () => void): HTMLElement {
+  const body = info
+    ? [
+        h('p', t('AI agents connect through MCP and use the same tools as you, in this window. Files they open and save stay in:')),
+        h('code.agent-path', info.root),
+        info.cliFound ? null : h('p.form-error', `${t('MCP server not built yet. Run in the desktop folder:')} npm run cli`),
+        ...agentConfigs(info).map(({ name, text }) => {
+          const pre = h('pre.agent-config', text);
+          const copy = h('button.ghost-btn', { type: 'button', onclick: () => void navigator.clipboard?.writeText(text).then(() => (copy.textContent = t('Copied'))) }, t('Copy'));
+          return h('div.agent-block', h('div.agent-head', h('b', name), copy), pre);
+        }),
+      ]
+    : [h('p', t('Agents connect to the desktop app. Open PhotoDesign with npm start in the desktop folder, or the installed app.'))];
+  return modal(close, h('div.dialog.agents-dialog', h('h2', t('Connect AI agents (MCP)')), ...body, h('div.dialog-actions', h('button.primary-btn', { type: 'button', onclick: close }, t('Done')))));
+}
+
 export function newDocumentDialog(app: App, close: () => void): HTMLElement {
   const num = (label: string, value: number, min: number, max: number) => {
     const input = h('input', { type: 'number', min, max, value: String(value), 'aria-label': label }) as HTMLInputElement;
@@ -158,6 +195,7 @@ function clientMenu(app: App, name: string): MenuNode | undefined {
     name === 'Window' ? PANELS.map(([tab, label]) => item(`window.${tab}`, label, () => document.querySelector<HTMLButtonElement>(`.seg[data-tab="${tab}"]`)?.click()))
     : name === 'Help' ? [
       item('help.actions', 'Find an action…', () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true })), 'Ctrl+K'),
+      item('help.agents', 'Connect AI agents (MCP)…', () => document.dispatchEvent(new CustomEvent('photodesign:agents'))),
       item('help.about', 'About PhotoDesign', () => app.notify(t('PhotoDesign — free and open source photo editor. Engine in Rust, interface in TypeScript.'))),
     ]
     : null;
