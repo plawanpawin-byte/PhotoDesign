@@ -59,3 +59,7 @@ engine's own build and test notes (it predates the interface change, so skip its
 
 MIT OR Apache-2.0 (see `LICENSE-MIT`, `LICENSE-APACHE`). Third-party material and its licences are
 in `NOTICE` and `ATTRIBUTION.md`.
+
+### Language share
+
+`node scripts/lang-share.mjs` counts only the code written for PhotoDesign (the `web/` interface, the `desktop/` host and the `photodesign-wasm` bridge), not the PhotoCraft engine in `crates/`. The engine is about 19 MB of Rust and is reused as it is.
