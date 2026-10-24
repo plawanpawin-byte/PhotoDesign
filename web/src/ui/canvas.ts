@@ -4,6 +4,7 @@ import type { App, Rect } from '../app';
 import { bytesToHex, toHex } from '../lib/color';
 import { pan, stepZoom, toDoc, toScreen, zoomAt, type Point } from '../lib/viewport';
 import { clickCall, dragCall, strokeCall, type StrokeContext } from '../tools/commands';
+import { convertCall, hasHandle, hitTest, nextIndex, overlayPoints, select as selectKnot, type Hit } from '../tools/pathedit';
 import { hitsFirst, segments } from '../tools/pen';
 import { STROKE_TOOLS, toolDef, type ToolId } from '../tools/tools';
 import { t } from '../lib/i18n';
@@ -58,6 +59,10 @@ export function canvasView(app: App): HTMLElement {
   let drag: Drag | null = null;
   /** Pen: the last anchor's handles follow the pointer while it is held down. */
   let penDragging = false;
+  /** Direct Selection: a drag in progress on an anchor, a handle or a segment, sent to the engine a frame at a time. */
+  let pathDrag: { hit: Hit; last: Point; pending: Point; alt: boolean; coalesce: string } | null = null;
+  let pathDragSeq = 0;
+  let pathFlushQueued = false;
   let panning: { from: Point; pointerId: number; button: number } | null = null;
   let queued = false;
   let checker: CanvasPattern | null = null;
@@ -179,6 +184,7 @@ export function canvasView(app: App): HTMLElement {
     if (stroke && stroke.screen.length) drawStrokePreview(ctx, stroke, app);
     if (drag) drawDrag(ctx, drag, app);
     if (app.pen) drawPen(ctx, app, pointer, penDragging);
+    if (app.pathEdit && app.tools.active === 'pathSelect') drawPathEdit(ctx, app);
     const tool = app.tools.active;
     if (pointer && STROKE_TOOLS.includes(tool) && !panning) {
       const r = Math.max(1, (app.brush.size * v.zoom) / 2);
@@ -213,6 +219,20 @@ export function canvasView(app: App): HTMLElement {
     }
   };
 
+  /** Sends the pending part of a Direct Selection drag to the engine; all of a drag's steps are one undo step. */
+  const flushPathDrag = () => {
+    pathFlushQueued = false;
+    const d = pathDrag;
+    const edit = app.pathEdit;
+    if (!d || !edit) return;
+    const [dx, dy] = [d.pending.x - d.last.x, d.pending.y - d.last.y];
+    if (d.hit.kind !== 'handle' && !dx && !dy) return;
+    d.last = d.pending;
+    if (d.hit.kind === 'anchor') app.pathCall('moveAnchors', { anchors: edit.selected, move: [dx, dy] }, d.coalesce);
+    else if (d.hit.kind === 'handle') app.pathCall('moveHandle', { subpath: d.hit.sub, knot: d.hit.knot, handle: d.hit.which, to: [d.pending.x, d.pending.y], independent: d.alt }, d.coalesce);
+    else app.pathCall('bendSegment', { subpath: d.hit.sub, knot: d.hit.knot, t: d.hit.t, move: [dx, dy] }, d.coalesce);
+  };
+
   const startPan = (e: PointerEvent) => {
     panning = { from: local(e), pointerId: e.pointerId, button: e.button };
     capture(e);
@@ -243,6 +263,27 @@ export function canvasView(app: App): HTMLElement {
       app.notify(t('Source set'));
     } else if ((tool === 'cloneStamp' || tool === 'healing') && !app.cloneSource) {
       app.notify(t('Alt-click to set a source first'), 'error');
+    } else if (tool === 'pathSelect') {
+      capture(e);
+      const edit = app.pathEdit;
+      if (!edit) {
+        app.notify(t('No path to edit: draw one with the Pen, or pick a shape layer'), 'error');
+      } else {
+        const hit = hitTest(edit.path, edit.selected, p, (q) => toScreen(app.view, q));
+        if (!hit) {
+          if (!e.shiftKey) app.selectPathKnots([]);
+        } else if (hit.kind === 'segment' && (e.ctrlKey || e.metaKey)) {
+          const added = app.pathCall('addAnchor', { subpath: hit.sub, knot: hit.knot, t: hit.t }) as { anchor?: { subpath: number; knot: number } } | undefined;
+          if (added?.anchor) app.selectPathKnots([[added.anchor.subpath, added.anchor.knot]]);
+        } else if (hit.kind === 'anchor' && e.altKey) {
+          const call = convertCall(edit.path, [hit.sub, hit.knot]);
+          app.selectPathKnots([[hit.sub, hit.knot]]);
+          if (call) app.pathCall('convertPoint', call);
+        } else {
+          if (hit.kind === 'anchor') app.selectPathKnots(selectKnot(edit.selected, [hit.sub, hit.knot], e.shiftKey));
+          pathDrag = { hit, last: d, pending: d, alt: e.altKey, coalesce: `path-edit-${++pathDragSeq}` };
+        }
+      }
     } else if (tool === 'pen') {
       capture(e);
       if (app.pen && hitsFirst(app.pen, p, (q) => toScreen(app.view, q))) {
@@ -284,6 +325,12 @@ export function canvasView(app: App): HTMLElement {
     }
     if (penDragging) {
       app.penDrag(toDoc(app.view, p));
+    } else if (pathDrag) {
+      pathDrag.pending = toDoc(app.view, p);
+      if (!pathFlushQueued) {
+        pathFlushQueued = true;
+        requestAnimationFrame(flushPathDrag);
+      }
     } else if (stroke) {
       const events = typeof e.getCoalescedEvents === 'function' ? e.getCoalescedEvents() : [];
       for (const ce of events.length ? events : [e]) {
@@ -334,6 +381,11 @@ export function canvasView(app: App): HTMLElement {
       updateCursor();
     }
     penDragging = false;
+    if (pathDrag) {
+      pathDrag.pending = toDoc(app.view, local(e));
+      flushPathDrag();
+      pathDrag = null;
+    }
     finishDrag(e);
     if (stroke) {
       const s = stroke;
@@ -415,6 +467,7 @@ export function canvasView(app: App): HTMLElement {
   app.on('crop', schedule);
   app.on('preview', schedule);
   app.on('pen', schedule);
+  app.on('path', schedule);
   app.on('tool', () => {
     updateCursor();
     schedule();
@@ -422,10 +475,15 @@ export function canvasView(app: App): HTMLElement {
   // Pen: Enter finishes the open path, Escape throws it away, Backspace takes the last point back.
   const penKeys = (e: KeyboardEvent) => {
     if (!stage.isConnected) return window.removeEventListener('keydown', penKeys);
-    if (!app.pen || app.tools.active !== 'pen') return;
+    const editing = app.tools.active === 'pathSelect' && !!app.pathEdit;
+    if (!(editing || (app.pen && app.tools.active === 'pen'))) return;
     const el = e.target as HTMLElement | null;
     if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return;
-    if (e.key === 'Enter') app.finishPen(false);
+    if (editing) {
+      if (e.key === 'Backspace' || e.key === 'Delete') app.deletePathKnots();
+      else if (e.key === 'Escape') app.selectPathKnots([]);
+      else return;
+    } else if (e.key === 'Enter') app.finishPen(false);
     else if (e.key === 'Escape') app.cancelPen();
     else if (e.key === 'Backspace' || e.key === 'Delete') app.penUndo();
     else return;
@@ -434,6 +492,63 @@ export function canvasView(app: App): HTMLElement {
   window.addEventListener('keydown', penKeys);
   updateCursor();
   return stage;
+}
+
+/** The path being edited with Direct Selection: its outline, every anchor, and the handles of the selected anchors. */
+function drawPathEdit(ctx: CanvasRenderingContext2D, app: App) {
+  const edit = app.pathEdit;
+  if (!edit) return;
+  const sc = (p: Point) => toScreen(app.view, p);
+  const at = (p: [number, number]) => sc({ x: p[0], y: p[1] });
+  ctx.save();
+  ctx.lineJoin = 'round';
+  const trace = () => {
+    ctx.beginPath();
+    for (const sub of edit.path.subpaths) {
+      const first = sub.knots[0];
+      if (!first) continue;
+      const s = at(first.anchor);
+      ctx.moveTo(s.x, s.y);
+      sub.knots.forEach((a, ki) => {
+        const ni = nextIndex(sub, ki);
+        if (ni === null) return;
+        const b = sub.knots[ni]!;
+        const end = at(b.anchor);
+        if (hasHandle(a, 'out') || hasHandle(b, 'in')) ctx.bezierCurveTo(at(a.out).x, at(a.out).y, at(b.in).x, at(b.in).y, end.x, end.y);
+        else ctx.lineTo(end.x, end.y);
+      });
+    }
+  };
+  trace();
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+  ctx.stroke();
+  trace();
+  ctx.lineWidth = 1.25;
+  ctx.strokeStyle = '#4da3ff';
+  ctx.stroke();
+  const { anchors, handles } = overlayPoints(edit.path, edit.selected);
+  ctx.lineWidth = 1;
+  for (const hd of handles) {
+    const a = sc(hd.from);
+    const b = sc(hd.to);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+  for (const an of anchors) {
+    const s = sc(an.at);
+    ctx.fillStyle = an.selected ? '#4da3ff' : '#fff';
+    ctx.fillRect(s.x - 3.5, s.y - 3.5, 7, 7);
+    ctx.strokeRect(s.x - 3.5, s.y - 3.5, 7, 7);
+  }
+  ctx.restore();
 }
 
 /** The Pen tool's path: its outline, a rubber band to the pointer, and the anchors with their handles. */

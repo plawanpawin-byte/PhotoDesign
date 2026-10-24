@@ -16,7 +16,7 @@ export type ToolId =
   | 'gradient' | 'fill'
   | 'blur' | 'sharpen' | 'smudge'
   | 'dodge' | 'burn' | 'sponge'
-  | 'pen'
+  | 'pen' | 'pathSelect'
   | 'type'
   | 'rectShape' | 'ellipseShape' | 'lineShape'
   | 'hand' | 'zoom';
@@ -64,6 +64,7 @@ export const TOOLS: readonly ToolDef[] = [
   { id: 'burn', label: 'Burn', key: 'O', hint: 'Paint to darken', cursor: 'none' },
   { id: 'sponge', label: 'Sponge', key: 'O', hint: 'Paint to change saturation', cursor: 'none' },
   { id: 'pen', label: 'Pen', key: 'P', hint: 'Click to add points, drag for curves; click the first point to close', cursor: 'crosshair' },
+  { id: 'pathSelect', label: 'Direct Selection', key: 'A', hint: 'Drag points and handles to reshape a path; Ctrl-click a segment to add a point', cursor: 'default' },
   { id: 'type', label: 'Type', key: 'T', hint: 'Click to add text', cursor: 'text' },
   { id: 'rectShape', label: 'Rectangle', key: 'U', hint: 'Drag to draw a rectangle shape layer', cursor: 'crosshair' },
   { id: 'ellipseShape', label: 'Ellipse', key: 'U', hint: 'Drag to draw an ellipse shape layer', cursor: 'crosshair' },

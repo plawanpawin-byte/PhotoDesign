@@ -63,6 +63,7 @@ export const ICONS = {
   burn: '<path d="M8 20c0-4 3-4 3-8 2 1.5 3.5 3.5 3.5 6"/><path d="M6 14a6 6 0 0 0 12 0c0-4-6-10.5-6-10.5S6 10 6 14z"/>',
   sponge: '<rect x="4" y="6" width="16" height="12" rx="4"/><circle cx="9" cy="10" r=".8"/><circle cx="14" cy="12" r=".8"/><circle cx="10" cy="14.5" r=".8"/>',
   pen: '<path d="M12 20.5l-1.8-5.2 7.6-9.6a1.8 1.8 0 0 1 2.7 2.3z"/><path d="M10.2 15.3L5 13.5l12.8-7.8"/><circle cx="11.6" cy="12.4" r=".9"/><path d="M12 20.5l-3 .5"/>',
+  pathSelect: '<path d="M6 4.5l12 7.2-5.4 1.2-2.5 5.3z"/><path d="M13.4 13.4l4.6 5.6"/>',
   type: '<path d="M5 6.5V5h14v1.5M12 5v14M9.5 19h5"/>',
   rectShape: '<rect x="4.5" y="6" width="15" height="12" rx="1"/>',
   ellipseShape: '<ellipse cx="12" cy="12" rx="8" ry="6.2"/>',

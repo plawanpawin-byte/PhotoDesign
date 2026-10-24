@@ -8,6 +8,7 @@ import { fit, type Size, type View } from './lib/viewport';
 import { commitCall, dragLastHandle, removeLastKnot, addKnot, type PenMode, type PenPath } from './tools/pen';
 import { ToolHand } from './tools/tools';
 import type { Point } from './lib/viewport';
+import { convertCall, type EnginePath, type KnotRef } from './tools/pathedit';
 
 export interface BrushSettings {
   size: number;
@@ -21,7 +22,7 @@ export interface FillSettings {
   contiguous: boolean;
 }
 
-export type Topic = 'state' | 'view' | 'tool' | 'settings' | 'toast' | 'crop' | 'preview' | 'pen';
+export type Topic = 'state' | 'view' | 'tool' | 'settings' | 'toast' | 'crop' | 'preview' | 'pen' | 'path';
 
 export type SelectMode = 'replace' | 'add' | 'subtract' | 'intersect';
 
@@ -90,6 +91,8 @@ export class App {
   /** The Pen tool's path while it is being drawn (document pixels), and where it goes when finished. */
   pen: PenPath | null = null;
   penMode: PenMode = 'shape';
+  /** Direct Selection: the path being edited (the active shape layer's, else the work path) and its selected anchors. */
+  pathEdit: { target: 'layer' | 'work'; path: EnginePath; selected: KnotRef[] } | null = null;
   toasts: Toast[] = [];
   /** A live, not yet applied, adjustment shown on the canvas. */
   preview: Preview | null = null;
@@ -102,6 +105,7 @@ export class App {
     this.tools.onChange(() => {
       // Picking another tool finishes a path in progress, as Photoshop keeps the work path.
       if (this.pen && this.tools.active !== 'pen') this.finishPen();
+      this.syncPathEdit();
       this.emit('tool');
     });
     this.refresh();
@@ -145,7 +149,62 @@ export class App {
       this.fittedRevisionDoc = key;
       if (this.doc) this.fitView();
     }
+    this.syncPathEdit();
     this.emit('state');
+  }
+
+  /** Direct Selection: reads the path being edited from the engine, keeping the selected anchors that still exist. */
+  private syncPathEdit() {
+    if (this.tools.active !== 'pathSelect' || !this.doc) {
+      if (this.pathEdit) {
+        this.pathEdit = null;
+        this.emit('path');
+      }
+      return;
+    }
+    const target = this.activeLayer()?.kind === 'Shape' ? 'layer' : 'work';
+    let path: EnginePath | null = null;
+    try {
+      const info = this.engine.execute('path.info', { name: target }) as { path?: EnginePath } | null;
+      path = info?.path?.subpaths?.length ? info.path : null;
+    } catch {
+      path = null;
+    }
+    const kept = (this.pathEdit?.target === target ? this.pathEdit.selected : []).filter(([s, k]) => !!path?.subpaths[s]?.knots[k]);
+    this.pathEdit = path ? { target, path, selected: kept } : null;
+    this.emit('path');
+  }
+
+  selectPathKnots(selected: KnotRef[]) {
+    if (!this.pathEdit) return;
+    this.pathEdit = { ...this.pathEdit, selected };
+    this.emit('path');
+  }
+
+  /** Runs one of the engine's `path.*` commands on the path being edited. `coalesce` merges a drag's steps into one undo step. */
+  pathCall(id: string, params: Record<string, unknown> = {}, coalesce?: string): unknown {
+    const edit = this.pathEdit;
+    if (!edit) return undefined;
+    return this.run(`path.${id}`, { name: edit.target, ...params, ...(coalesce ? { coalesce } : {}) });
+  }
+
+  /** Direct Selection: turns every selected anchor between corner and smooth. */
+  toggleSmoothSelected() {
+    const edit = this.pathEdit;
+    if (!edit) return;
+    for (const ref of edit.selected) {
+      const call = convertCall(this.pathEdit?.path ?? edit.path, ref);
+      if (call) this.pathCall('convertPoint', call);
+    }
+  }
+
+  /** Direct Selection: Delete removes the selected anchors (the last ones first, so the others keep their numbers). */
+  deletePathKnots() {
+    const edit = this.pathEdit;
+    if (!edit || !edit.selected.length) return;
+    const order = [...edit.selected].sort((a, b) => b[0] - a[0] || b[1] - a[1]);
+    for (const [subpath, knot] of order) if (this.pathCall('deleteAnchor', { subpath, knot }) === undefined) break;
+    this.selectPathKnots([]);
   }
 
   /** Runs a command; errors become a toast. Returns the result, or `undefined` on failure. */

@@ -8,6 +8,8 @@ export class FakeEngine implements EngineApi {
   bg = [1, 1, 1, 1];
   rev = 0;
   failNext: string | null = null;
+  /** The path a shape layer or the work path holds, in the engine's own form. */
+  path: { subpaths: { closed: boolean; knots: { anchor: number[]; in: number[]; out: number[]; smooth: boolean }[]; op: string }[] } | null = null;
 
   execute(id: string, params: Record<string, unknown> = {}): unknown {
     this.calls.push([id, params]);
@@ -28,6 +30,27 @@ export class FakeEngine implements EngineApi {
         this.doc.history.push('New Layer');
         this.doc.canUndo = true;
         return {};
+      case 'shape.create': {
+        if (!this.doc) throw new Error('no document');
+        const p = params.path as { subpaths: { closed: boolean; knots: (number[] | { anchor: number[]; in: number[]; out: number[] })[] }[] } | undefined;
+        if (params.kind === 'path' && p) {
+          this.path = { subpaths: p.subpaths.map((s) => ({ closed: s.closed, op: 'combine', knots: s.knots.map((k) => (Array.isArray(k) ? { anchor: k, in: k, out: k, smooth: false } : { ...k, smooth: true })) })) };
+          this.doc.layers.unshift({ id: 2, name: 'Shape 1', kind: 'Shape', visible: true, opacity: 1, fill: 1, blend: 'Normal', clipped: false, hasMask: false, selected: true, bounds: null });
+          this.doc.activeLayer = 2;
+        }
+        return {};
+      }
+      case 'path.info':
+        if (!this.path) throw new Error('there is no path');
+        return { name: params.name, path: structuredClone(this.path) };
+      case 'path.addAnchor':
+        return { name: params.name, path: this.path, anchor: { subpath: params.subpath, knot: Number(params.knot) + 1 } };
+      case 'path.moveAnchors':
+      case 'path.moveHandle':
+      case 'path.bendSegment':
+      case 'path.convertPoint':
+      case 'path.deleteAnchor':
+        return { name: params.name, path: this.path };
       case 'tools.setColors':
         if (typeof params.foreground === 'string') this.fg = hex(params.foreground);
         if (typeof params.background === 'string') this.bg = hex(params.background);

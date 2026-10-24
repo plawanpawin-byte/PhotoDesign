@@ -134,3 +134,164 @@ describe('Pen tool on the canvas', () => {
     expect(engine.calls.find(([id]) => id === 'path.set')?.[1]).toMatchObject({ name: 'work' });
   });
 });
+
+import { convertCall, hasHandle, hitTest, nextIndex, overlayPoints, segmentAt, select, smoothOut, type EnginePath } from '../src/tools/pathedit';
+
+const knot = (x: number, y: number, ix = x, iy = y, ox = x, oy = y) => ({ anchor: [x, y] as [number, number], in: [ix, iy] as [number, number], out: [ox, oy] as [number, number], smooth: ix !== x || ox !== x });
+const square = (): EnginePath => ({ subpaths: [{ closed: true, knots: [knot(0, 0), knot(100, 0), knot(100, 100), knot(0, 100)] }] });
+const scale = (p: { x: number; y: number }) => ({ x: p.x * 2, y: p.y * 2 });
+
+describe('path editing: what is under the pointer', () => {
+  it('finds an anchor within its radius, and prefers it to the segment through it', () => {
+    expect(hitTest(square(), [], at(200, 2), scale)).toEqual({ kind: 'anchor', sub: 0, knot: 1 });
+    expect(hitTest(square(), [], at(100, 2), scale)).toMatchObject({ kind: 'segment', sub: 0, knot: 0 });
+  });
+
+  it('finds a selected anchor\'s handle before the anchor under it, and ignores handles of unselected ones', () => {
+    const path: EnginePath = { subpaths: [{ closed: false, knots: [knot(50, 50, 40, 50, 60, 50), knot(150, 50)] }] };
+    expect(hitTest(path, [[0, 0]], at(120, 100), scale)).toEqual({ kind: 'handle', sub: 0, knot: 0, which: 'out' });
+    expect(hitTest(path, [], at(120, 100), scale)).toMatchObject({ kind: 'segment' });
+  });
+
+  it('finds a point along a segment, with its t; the closing segment of a closed subpath counts', () => {
+    const bottom = hitTest(square(), [], at(100, 200), scale);
+    expect(bottom).toMatchObject({ kind: 'segment', sub: 0, knot: 2 });
+    const closing = hitTest(square(), [], at(2, 100), scale);
+    expect(closing).toMatchObject({ kind: 'segment', sub: 0, knot: 3 });
+    const t = (closing as { t: number }).t;
+    expect(segmentAt(square().subpaths[0]!.knots[3]!, square().subpaths[0]!.knots[0]!, t)[1]).toBeCloseTo(100 - t * 100, 5);
+    expect(hitTest(square(), [], at(100, 100), scale)).toBeNull();
+  });
+
+  it('follows a curved segment, not the straight line between its anchors', () => {
+    const path: EnginePath = { subpaths: [{ closed: false, knots: [knot(0, 0, 0, 0, 0, 100), knot(100, 0, 100, 100, 100, 0)] }] };
+    expect(hitTest(path, [], at(100, 150), scale)).toMatchObject({ kind: 'segment' });
+    expect(hitTest(path, [], at(100, 0), scale)).toBeNull();
+  });
+
+  it('knows where a segment leaves and which anchor it reaches', () => {
+    const sq = square().subpaths[0]!;
+    expect(nextIndex(sq, 3)).toBe(0);
+    expect(nextIndex({ ...sq, closed: false }, 3)).toBeNull();
+    expect(nextIndex(sq, 0)).toBe(1);
+  });
+});
+
+describe('path editing: selection and conversion', () => {
+  it('a plain click selects one anchor; Shift adds and removes; clicking a selected one keeps the group', () => {
+    expect(select([], [0, 1], false)).toEqual([[0, 1]]);
+    expect(select([[0, 1]], [0, 2], true)).toEqual([[0, 1], [0, 2]]);
+    expect(select([[0, 1], [0, 2]], [0, 1], true)).toEqual([[0, 2]]);
+    expect(select([[0, 1], [0, 2]], [0, 1], false)).toEqual([[0, 1], [0, 2]]);
+    expect(select([[0, 1]], [0, 3], false)).toEqual([[0, 3]]);
+  });
+
+  it('Alt-click on a corner asks for a smooth point along its neighbours, on a curve for a corner', () => {
+    const call = convertCall(square(), [0, 1])!;
+    expect(call).toMatchObject({ subpath: 0, knot: 1 });
+    // Along the line between its neighbours (0,0) and (100,100), a third of the way to the nearer one.
+    const reach = 100 / 3 / Math.SQRT2;
+    expect(call.out).toEqual([expect.closeTo(100 + reach, 5), expect.closeTo(reach, 5)]);
+    const curved: EnginePath = { subpaths: [{ closed: true, knots: [knot(0, 0), knot(100, 0, 80, 0, 120, 0), knot(100, 100)] }] };
+    expect(convertCall(curved, [0, 1])).toEqual({ subpath: 0, knot: 1 });
+    expect(convertCall(curved, [3, 0])).toBeNull();
+    expect(hasHandle(curved.subpaths[0]!.knots[1]!, 'out')).toBe(true);
+    // An end of an open subpath has one neighbour, so the handle runs toward it.
+    const open = { closed: false, knots: [knot(0, 0), knot(90, 0)] };
+    expect(smoothOut(open, 0)).toEqual([30, 0]);
+  });
+
+  it('lists anchors, and handles only for the selected ones', () => {
+    const path: EnginePath = { subpaths: [{ closed: false, knots: [knot(50, 50, 40, 50, 60, 50), knot(150, 50, 140, 50, 160, 50)] }] };
+    const o = overlayPoints(path, [[0, 0]]);
+    expect(o.anchors.map((a) => a.selected)).toEqual([true, false]);
+    expect(o.handles).toHaveLength(2);
+    expect(overlayPoints(path, []).handles).toHaveLength(0);
+  });
+});
+
+describe('Direct Selection on the canvas', () => {
+  const call = (app: App, method: string, params: Record<string, unknown> = {}) => handleControl(app, { method, params });
+  const key = (k: string) => window.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+  const drag = (app: App, from: [number, number], to: [number, number], mods: Record<string, boolean> = {}) =>
+    call(app, 'ui.pointer', { ...mods, events: [{ kind: 'down', x: from[0], y: from[1] }, { kind: 'move', x: to[0], y: to[1] }, { kind: 'up', x: to[0], y: to[1] }] });
+  const setup = async (drawPath = true) => {
+    document.body.innerHTML = '<div id="root"></div>';
+    const engine = new FakeEngine();
+    const app = new App(engine);
+    mount(document.getElementById('root')!, app);
+    await call(app, 'engine.execute', { command: 'file.new', params: { width: 400, height: 400 } });
+    if (drawPath) await call(app, 'engine.execute', { command: 'shape.create', params: { kind: 'path', path: { subpaths: [{ closed: true, knots: [[100, 100], [300, 100], [300, 300]] }] }, fill: '#000' } });
+    await call(app, 'ui.set', { tool: 'pathSelect' });
+    return { app, engine };
+  };
+  const last = (engine: FakeEngine, id: string) => engine.calls.filter(([c]) => c === id).at(-1)?.[1];
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('loads the active shape layer\'s path when the tool is picked, and nothing without one', async () => {
+    const { app } = await setup();
+    expect(app.pathEdit?.target).toBe('layer');
+    expect(app.pathEdit?.path.subpaths[0]!.knots).toHaveLength(3);
+    const none = await setup(false);
+    expect(none.app.pathEdit).toBeNull();
+    none.app.tools.select('brush');
+  });
+
+  it('clicking an anchor selects it, Shift adds another, clicking empty space clears them', async () => {
+    const { app } = await setup();
+    await call(app, 'ui.pointer', { events: [{ kind: 'down', x: 100, y: 100 }, { kind: 'up', x: 100, y: 100 }] });
+    expect(app.pathEdit!.selected).toEqual([[0, 0]]);
+    await call(app, 'ui.pointer', { shift: true, events: [{ kind: 'down', x: 300, y: 100 }, { kind: 'up', x: 300, y: 100 }] });
+    expect(app.pathEdit!.selected).toEqual([[0, 0], [0, 1]]);
+    await call(app, 'ui.pointer', { events: [{ kind: 'down', x: 20, y: 380 }, { kind: 'up', x: 20, y: 380 }] });
+    expect(app.pathEdit!.selected).toEqual([]);
+  });
+
+  it('dragging an anchor moves the selected anchors by the drag, as one coalesced step', async () => {
+    const { app, engine } = await setup();
+    await drag(app, [300, 100], [340, 130]);
+    const moved = last(engine, 'path.moveAnchors');
+    expect(moved).toMatchObject({ name: 'layer', anchors: [[0, 1]], move: [40, 30] });
+    expect(typeof moved?.coalesce).toBe('string');
+  });
+
+  it('dragging a handle moves that handle to the pointer', async () => {
+    const { app, engine } = await setup();
+    engine.path!.subpaths[0]!.knots[1] = { anchor: [300, 100], in: [260, 100], out: [340, 100], smooth: true };
+    app.refresh();
+    await call(app, 'ui.pointer', { events: [{ kind: 'down', x: 300, y: 100 }, { kind: 'up', x: 300, y: 100 }] });
+    await drag(app, [340, 100], [360, 160]);
+    expect(last(engine, 'path.moveHandle')).toMatchObject({ subpath: 0, knot: 1, handle: 'out', to: [360, 160], independent: false });
+  });
+
+  it('dragging a segment bends it; Ctrl-click on one adds a point there', async () => {
+    const { app, engine } = await setup();
+    await drag(app, [200, 100], [200, 140]);
+    expect(last(engine, 'path.bendSegment')).toMatchObject({ subpath: 0, knot: 0, move: [0, 40] });
+    expect((last(engine, 'path.bendSegment') as { t: number }).t).toBeCloseTo(0.5, 1);
+    await call(app, 'ui.pointer', { ctrl: true, events: [{ kind: 'down', x: 250, y: 100 }, { kind: 'up', x: 250, y: 100 }] });
+    expect(last(engine, 'path.addAnchor')).toMatchObject({ subpath: 0, knot: 0 });
+    expect(app.pathEdit!.selected).toEqual([[0, 1]]);
+  });
+
+  it('Alt-click converts a corner to smooth, and Delete removes the selected anchors from the end', async () => {
+    const { app, engine } = await setup();
+    await call(app, 'ui.pointer', { alt: true, events: [{ kind: 'down', x: 300, y: 300 }, { kind: 'up', x: 300, y: 300 }] });
+    expect(last(engine, 'path.convertPoint')).toMatchObject({ subpath: 0, knot: 2, out: expect.any(Array) });
+    await call(app, 'ui.pointer', { events: [{ kind: 'down', x: 100, y: 100 }, { kind: 'up', x: 100, y: 100 }] });
+    await call(app, 'ui.pointer', { shift: true, events: [{ kind: 'down', x: 300, y: 100 }, { kind: 'up', x: 300, y: 100 }] });
+    key('Delete');
+    const removed = engine.calls.filter(([c]) => c === 'path.deleteAnchor').map(([, p]) => p.knot);
+    expect(removed).toEqual([1, 0]);
+    expect(app.pathEdit!.selected).toEqual([]);
+  });
+
+  it('picking another tool stops editing the path', async () => {
+    const { app } = await setup();
+    app.tools.select('brush');
+    expect(app.pathEdit).toBeNull();
+  });
+});

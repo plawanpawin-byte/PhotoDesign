@@ -229,6 +229,16 @@ export function toolOptions(app: App): HTMLElement {
       el.append(select('Mode', MODES, app.select.mode, (v) => app.setSelect({ mode: v })), h('button.bar-btn.ghost-btn', { onclick: () => app.run('select.subject', { mode: app.select.mode }) }, t('Select Subject')));
     } else if (tool === 'type') {
       el.append(slider('Size', 4, 400, 1, r.typeSize, (v) => `${v}pt`, (v) => app.setRetouch({ typeSize: v })), h('span.opt-hint', `${t('Colour')} ${app.foreground}`));
+    } else if (tool === 'pathSelect') {
+      const edit = app.pathEdit;
+      if (!edit) {
+        el.append(h('span.opt-hint', t('No path to edit: draw one with the Pen, or pick a shape layer')));
+      } else {
+        const n = edit.selected.length;
+        el.append(h('span.opt-hint', `${edit.target === 'layer' ? t('Shape layer path') : t('Work path')} · ${n} ${t('selected')} · ${t(def.hint)}`),
+          h('button.ghost-btn', { disabled: n === 0, onclick: () => app.deletePathKnots() }, t('Delete point')),
+          h('button.ghost-btn', { disabled: n === 0, onclick: () => app.toggleSmoothSelected() }, t('Smooth / corner')));
+      }
     } else if (tool === 'pen') {
       el.append(select('Mode', [['shape', 'Shape'], ['path', 'Path']] as const, app.penMode, (v) => app.setPenMode(v)));
       if (app.pen) {
@@ -254,6 +264,7 @@ export function toolOptions(app: App): HTMLElement {
   app.on('tool', render);
   app.on('crop', render);
   app.on('pen', render);
+  app.on('path', render);
   app.on('settings', () => {
     // Rebuild only when a value shown as text changed; a slider being dragged keeps its element.
     if (!el.contains(document.activeElement) || document.activeElement?.tagName !== 'INPUT') render();
