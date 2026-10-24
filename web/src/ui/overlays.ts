@@ -146,29 +146,20 @@ export function commandPalette(app: App, close: () => void): HTMLElement {
   return el;
 }
 
-/** Every menu the engine defines, as a two-column popover: menus on the left, items on the right. */
-export function menuPopover(app: App, anchor: HTMLElement, close: () => void): HTMLElement {
-  const tree = buildMenuTree(app.commands());
-  const left = h('ul.menu-groups');
-  const right = h('div.menu-items');
-  let current: MenuNode | undefined = tree[0];
-  const showNode = (node: MenuNode) => {
-    current = node;
-    [...left.children].forEach((el) => el.classList.toggle('active', (el as HTMLElement).dataset.name === node.name));
-    clear(right);
-    const section = (n: MenuNode, depth: number) => {
-      if (depth > 0) right.append(h('p.menu-sub', n.name));
-      for (const c of n.commands)
-        right.append(h('button.menu-item', { disabled: !c.enabled, title: c.disabledReason ?? c.id, onclick: () => { close(); app.run(c.id); } }, h('span', c.label), c.shortcut ? h('span.menu-hint', c.shortcut.replace('Cmd', 'Ctrl')) : null));
-      for (const child of n.children) section(child, depth + 1);
-    };
-    section(node, 0);
+/** One menu-bar menu as a drop-down; submenus open to the side on hover. */
+export function menuDropdown(app: App, name: string, anchor: HTMLElement, close: () => void): HTMLElement {
+  const node = buildMenuTree(app.commands()).find((n) => n.name === name);
+  const list = (n: MenuNode): HTMLElement => {
+    const el = h('div.menu-list', { role: 'menu' });
+    for (const c of n.commands)
+      el.append(h('button.menu-item', { role: 'menuitem', disabled: !c.enabled, title: c.disabledReason ?? '', onclick: () => { close(); app.run(c.id); } }, h('span', c.label), c.shortcut ? h('span.menu-hint', c.shortcut.replace('Cmd', 'Ctrl')) : null));
+    if (n.commands.length && n.children.length) el.append(h('div.menu-sep'));
+    for (const child of n.children)
+      el.append(h('div.menu-sub-row', h('div.menu-item.has-sub', h('span', t(child.name)), icon(ICONS.chevron, 12)), h('div.menu-fly', list(child))));
+    if (!n.commands.length && !n.children.length) el.append(h('div.menu-empty', t('Nothing here yet')));
+    return el;
   };
-  for (const node of tree) {
-    left.append(h('li', { dataset: { name: node.name }, onmouseenter: () => showNode(node), onclick: () => showNode(node) }, node.name, icon(ICONS.chevron, 13)));
-  }
-  if (current) showNode(current);
   const r = anchor.getBoundingClientRect();
-  const pop = h('div.menu-pop', { style: { left: `${r.left}px`, top: `${r.bottom + 6}px` } }, left, right);
-  return modal(close, pop);
+  const drop = h('div.menu-drop', { dataset: { menu: name }, style: { left: `${r.left}px`, top: `${r.bottom}px` } }, node ? list(node) : null);
+  return modal(close, drop);
 }

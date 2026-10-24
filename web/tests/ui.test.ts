@@ -47,6 +47,27 @@ describe('interface', () => {
     expect(root.querySelector('.tool-options')?.textContent).toContain('Tolerance');
   });
 
+  it('zoom lives in the status bar and takes a typed percentage', () => {
+    const { root, app } = setup();
+    app.newDocument({ width: 200, height: 100 });
+    const input = root.querySelector<HTMLInputElement>('.status .zoom-input')!;
+    input.value = '200';
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    expect(app.view.zoom).toBe(2);
+    expect(input.value).toBe('200%');
+  });
+
+  it('the colour panel and swatches set the foreground colour', () => {
+    const { root, engine } = setup();
+    const hex = root.querySelector<HTMLInputElement>('.hex-input')!;
+    hex.value = '#ff8800';
+    hex.dispatchEvent(new Event('change'));
+    expect(engine.calls.at(-1)).toEqual(['tools.setColors', { foreground: '#ff8800' }]);
+    root.querySelector<HTMLButtonElement>('.seg[data-tab="swatches"]')!.click();
+    root.querySelectorAll<HTMLButtonElement>('.swatch')[4]!.click();
+    expect(engine.calls.at(-1)).toEqual(['tools.setColors', { foreground: '#ff0000' }]);
+  });
+
   it('the action finder searches engine commands and runs one', () => {
     const { root, engine, app } = setup();
     app.newDocument({ width: 20, height: 20 });
@@ -62,18 +83,28 @@ describe('interface', () => {
     expect(root.querySelector('.palette')).toBeNull();
   });
 
-  it('the menu lists engine menus and the inspector switches views', () => {
-    const { root, app } = setup();
+  it('the menu bar lists engine menus, opens one as a drop-down and the panels switch views', () => {
+    const { root, app, engine } = setup();
     app.newDocument({ width: 20, height: 20 });
-    root.querySelector<HTMLButtonElement>('.topbar .ghost-btn')!.click();
-    const groups = [...root.querySelectorAll('.menu-groups li')].map((l) => l.textContent);
-    expect(groups).toEqual(['File', 'Image', 'Filter']);
+    const items = [...root.querySelectorAll<HTMLButtonElement>('.menubar-item')];
+    expect(items.map((b) => b.textContent)).toEqual(['File', 'Image', 'Filter']);
+    items[1]!.click();
+    const drop = root.querySelector('.menu-drop')!;
+    expect(drop.querySelector('.menu-item.has-sub')?.textContent).toBe('Adjustments');
+    drop.querySelector<HTMLButtonElement>('.menu-fly button.menu-item')!.click();
+    expect(engine.calls.at(-1)?.[0]).toBe('image.adjustments.invert');
+    expect(root.querySelector('.menu-drop')).toBeNull();
+    items[0]!.click();
+    items[2]!.dispatchEvent(new MouseEvent('mouseenter'));
+    expect(root.querySelector<HTMLElement>('.menu-drop')?.dataset.menu).toBe('Filter');
     key('keydown', 'Escape');
-    expect(root.querySelector('.menu-pop')).toBeNull();
+    expect(root.querySelector('.menu-drop')).toBeNull();
+    expect(root.querySelectorAll('.panel-group')).toHaveLength(3);
+    expect(root.querySelector('.panel-group[data-group="bottom"] .seg.active')?.textContent).toBe('Layers');
     root.querySelector<HTMLButtonElement>('.seg[data-tab="layers"]')!.click();
     expect(root.querySelectorAll('.layer-row')).toHaveLength(1);
     root.querySelector<HTMLButtonElement>('.seg[data-tab="history"]')!.click();
-    expect(root.querySelector('.history-row.active')?.textContent).toContain('New');
+    expect(root.querySelector('.history-row.active')?.textContent).toContain('image.adjustments.invert');
     root.querySelector<HTMLButtonElement>('.seg[data-tab="adjust"]')!.click();
     expect(root.querySelectorAll('.adjust-card').length).toBeGreaterThan(3);
   });

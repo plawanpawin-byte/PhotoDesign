@@ -7,10 +7,10 @@ import { actionFor, isTyping, nextBrushSize } from './lib/keys';
 import { centre, stepZoom, zoomAt } from './lib/viewport';
 import { toolByKey } from './tools/tools';
 import { canvasView } from './ui/canvas';
-import { statusLine, toasts, toolDock, toolOptions, topBar, zoomControl } from './ui/chrome';
+import { docTabs, menuBar, statusLine, toasts, toolDock, toolOptions } from './ui/chrome';
 import { h } from './ui/dom';
-import { inspector } from './ui/inspector';
-import { commandPalette, menuPopover, newDocumentDialog, welcome } from './ui/overlays';
+import { panelDock } from './ui/inspector';
+import { commandPalette, menuDropdown, newDocumentDialog, welcome } from './ui/overlays';
 
 const ACCEPT = '.png,.jpg,.jpeg,.webp,.gif,.bmp,.tif,.tiff,.psd,.psb,.pcraft,.exr,.hdr,.tga,.dng,.cr2,.cr3,.nef,.arw,.raf,.orf,.rw2,.heic,.heif,.qoi,.ico';
 
@@ -20,6 +20,7 @@ export function mount(root: HTMLElement, app: App): () => void {
   const on = (target: EventTarget, type: string, fn: (e: any) => void, options?: AddEventListenerOptions) => target.addEventListener(type, fn, { ...options, signal: life.signal });
   let overlay: HTMLElement | null = null;
   const closeOverlay = () => {
+    root.querySelectorAll('.menubar-item.open').forEach((b) => b.classList.remove('open'));
     overlay?.remove();
     overlay = null;
   };
@@ -36,12 +37,23 @@ export function mount(root: HTMLElement, app: App): () => void {
   const actions = {
     openPicker: () => picker.click(),
     openPalette: () => show(commandPalette(app, closeOverlay)),
-    openMenu: (anchor: HTMLElement) => show(menuPopover(app, anchor, closeOverlay)),
+    openMenu: (name: string, anchor: HTMLElement) => {
+      const same = overlay?.querySelector<HTMLElement>('.menu-drop')?.dataset.menu === name;
+      if (same) return closeOverlay();
+      show(menuDropdown(app, name, anchor, closeOverlay));
+      root.querySelectorAll('.menubar-item').forEach((b) => b.classList.toggle('open', b === anchor));
+    },
     openNew: () => show(newDocumentDialog(app, closeOverlay)),
   };
 
-  const stage = h('main.workspace', canvasView(app), toolOptions(app), zoomControl(app), welcome(app, actions.openPicker, actions.openNew));
-  root.append(h('div.shell', topBar(app, actions), h('div.body', toolDock(app), stage, inspector(app)), statusLine(app)), toasts(app), picker);
+  const stage = h('main.workspace', canvasView(app), welcome(app, actions.openPicker, actions.openNew));
+  const bar = menuBar(app, actions);
+  // While a menu is open, pointing at another menu-bar entry opens that one instead.
+  bar.querySelectorAll<HTMLElement>('.menubar-item').forEach((b) =>
+    b.addEventListener('mouseenter', () => {
+      if (overlay?.querySelector('.menu-drop') && !b.classList.contains('open')) actions.openMenu(b.dataset.menu!, b);
+    }));
+  root.append(h('div.shell', bar, toolOptions(app), h('div.body', toolDock(app), h('div.center', docTabs(app, actions), stage), panelDock(app)), statusLine(app)), toasts(app), picker);
 
   const mid = () => ({ x: app.viewport.width / 2, y: app.viewport.height / 2 });
   on(window, 'keydown', (e) => {

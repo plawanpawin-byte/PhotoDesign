@@ -1,42 +1,115 @@
-// The inspector: one card on the right with three views — Layers, Adjust and History.
+// The panel dock on the right: three stacked groups like a desk of tools —
+// Color and Swatches on top, Properties, Adjustments and History in the middle, Layers below.
 import type { App } from '../app';
 import { findLayer } from '../app';
 import type { LayerInfo } from '../engine/types';
+import { fromHex } from '../lib/color';
 import { t } from '../lib/i18n';
 import { clear, h, icon } from './dom';
 import { ICONS } from './icons';
 
-type Tab = 'layers' | 'adjust' | 'image' | 'history';
-const TABS: readonly Tab[] = ['layers', 'adjust', 'image', 'history'];
-const TAB_LABEL: Record<Tab, string> = { layers: 'Layers', adjust: 'Adjust', image: 'Image', history: 'History' };
-const TAB_ICON: Record<Tab, string> = { layers: ICONS.layers, adjust: ICONS.sliders, image: ICONS.image, history: ICONS.clock };
-/** Survives a rebuild of the interface (language change). */
-let rememberedTab: Tab = 'layers';
+type Tab = 'color' | 'swatches' | 'image' | 'adjust' | 'history' | 'layers';
+const TAB_LABEL: Record<Tab, string> = { color: 'Color', swatches: 'Swatches', image: 'Properties', adjust: 'Adjustments', history: 'History', layers: 'Layers' };
+/** Views holding slider positions: they rebuild only on tab or document change, not on every state change. */
+const STICKY: readonly Tab[] = ['adjust', 'image'];
+/** The open tab of each group survives a rebuild of the interface (language change). */
+const remembered = new Map<string, Tab>();
+const collapsed = new Set<string>();
 
 const BLENDS = ['Normal', 'Dissolve', 'Darken', 'Multiply', 'Color Burn', 'Linear Burn', 'Lighten', 'Screen', 'Color Dodge', 'Linear Dodge (Add)', 'Overlay', 'Soft Light', 'Hard Light', 'Vivid Light', 'Linear Light', 'Pin Light', 'Hard Mix', 'Difference', 'Exclusion', 'Subtract', 'Divide', 'Hue', 'Saturation', 'Color', 'Luminosity'];
 
-export function inspector(app: App): HTMLElement {
-  let tab: Tab = rememberedTab;
-  const body = h('div.inspector-body');
-  const tabs = TABS.map((id) =>
-    h('button.seg', { role: 'tab', title: t(TAB_LABEL[id]), dataset: { tab: id }, onclick: () => { tab = id; rememberedTab = id; render(); } },
-      icon(TAB_ICON[id], 15), h('span', t(TAB_LABEL[id]))));
+export function panelDock(app: App): HTMLElement {
+  return h('aside.panel-dock',
+    panelGroup(app, 'top', ['color', 'swatches']),
+    panelGroup(app, 'middle', ['image', 'adjust', 'history']),
+    panelGroup(app, 'bottom', ['layers']),
+  );
+}
+
+function panelGroup(app: App, id: string, tabs: readonly Tab[]): HTMLElement {
+  let tab: Tab = remembered.get(id) ?? tabs[0]!;
+  const body = h('div.panel-body');
+  const group = h('section.panel-group', { dataset: { group: id }, class: collapsed.has(id) ? 'collapsed' : '' });
+  const buttons = tabs.map((tb) =>
+    h('button.seg', { role: 'tab', dataset: { tab: tb }, onclick: () => { tab = tb; remembered.set(id, tb); collapsed.delete(id); group.classList.remove('collapsed'); render(); } }, t(TAB_LABEL[tb])));
+  const toggle = h('button.panel-collapse', { title: t('Collapse'), onclick: () => { group.classList.toggle('collapsed'); if (group.classList.contains('collapsed')) collapsed.add(id); else collapsed.delete(id); } }, icon(ICONS.chevron, 12));
   const render = () => {
-    app.setPreview(null);
-    for (const b of tabs) b.classList.toggle('active', b.dataset.tab === tab);
+    if (tab === 'adjust' || tabs.includes('adjust')) app.setPreview(null);
+    for (const b of buttons) b.classList.toggle('active', b.dataset.tab === tab);
     clear(body);
+    if (tab === 'color') return void body.append(colorView(app));
+    if (tab === 'swatches') return void body.append(swatchesView(app));
     if (!app.doc) {
-      body.append(h('p.empty-note', t('Open or create a document to see its layers, adjustments and history.')));
+      body.append(h('p.empty-note', t(tab === 'layers' ? 'No document' : 'No properties')));
       return;
     }
     body.append(tab === 'layers' ? layersView(app) : tab === 'adjust' ? adjustView(app) : tab === 'image' ? imageView(app) : historyView(app));
   };
+  let docKey = '';
   app.on('state', () => {
-    // Keep slider positions while adjusting: the Adjust view rebuilds only on tab or document change.
-    if ((tab !== 'adjust' && tab !== 'image') || !body.querySelector('.adjust, .imageview')) render();
+    const key = `${app.state.session.active}`;
+    const changedDoc = key !== docKey;
+    docKey = key;
+    if (!STICKY.includes(tab) || changedDoc || !body.querySelector('.adjust, .imageview')) render();
   });
+  docKey = `${app.state.session.active}`;
   render();
-  return h('aside.inspector', h('div.segmented', { role: 'tablist' }, tabs), body);
+  group.append(h('header.panel-head', h('div.panel-tabs', { role: 'tablist' }, buttons), toggle), body);
+  return group;
+}
+
+function colorView(app: App): HTMLElement {
+  const hex = h('input.hex-input', { type: 'text', maxlength: 7, 'aria-label': t('Hex colour') }) as HTMLInputElement;
+  const fields = (['R', 'G', 'B'] as const).map((c) => h('input.num-input', { type: 'number', min: 0, max: 255, 'aria-label': c }) as HTMLInputElement);
+  const big = h('label.color-big', h('input.chip-input', { type: 'color', 'aria-label': t('Foreground colour'), onchange: (e: Event) => app.setForeground((e.target as HTMLInputElement).value) }));
+  const small = h('label.color-small', h('input.chip-input', { type: 'color', 'aria-label': t('Background colour'), onchange: (e: Event) => app.setBackground((e.target as HTMLInputElement).value) }));
+  const ramp = h('div.color-ramp', { title: t('Pick a hue') });
+  const shade = h('div.color-shade', { title: t('Pick a shade') });
+  const toHex2 = (n: number) => Math.round(Math.min(255, Math.max(0, n))).toString(16).padStart(2, '0');
+  const hsv = (hh: number, sat: number, val: number) => {
+    const f = (n: number) => {
+      const k = (n + hh / 60) % 6;
+      return val - val * sat * Math.max(0, Math.min(k, 4 - k, 1));
+    };
+    return `#${toHex2(f(5) * 255)}${toHex2(f(3) * 255)}${toHex2(f(1) * 255)}`;
+  };
+  let hue = 210;
+  const paintShade = () => (shade.style.background = `linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, ${hsv(hue, 1, 1)})`);
+  const pick = (el: HTMLElement, e: PointerEvent, fn: (x: number, y: number) => void) => {
+    const r = el.getBoundingClientRect();
+    fn(Math.min(1, Math.max(0, (e.clientX - r.left) / Math.max(1, r.width))), Math.min(1, Math.max(0, (e.clientY - r.top) / Math.max(1, r.height))));
+  };
+  ramp.addEventListener('pointerdown', (e) => pick(ramp, e, (_x, y) => { hue = y * 360; paintShade(); }));
+  shade.addEventListener('pointerdown', (e) => pick(shade, e, (x, y) => app.setForeground(hsv(hue, x, 1 - y))));
+  const sync = () => {
+    hex.value = app.foreground;
+    const rgb = fromHex(app.foreground) ?? [0, 0, 0];
+    fields.forEach((f, i) => (f.value = String(Math.round(rgb[i]! * 255))));
+    big.style.background = app.foreground;
+    small.style.background = app.background;
+    (big.firstChild as HTMLInputElement).value = app.foreground;
+    (small.firstChild as HTMLInputElement).value = app.background;
+  };
+  hex.addEventListener('change', () => {
+    const v = hex.value.startsWith('#') ? hex.value : `#${hex.value}`;
+    if (fromHex(v)) app.setForeground(v);
+    else sync();
+  });
+  for (const f of fields) f.addEventListener('change', () => app.setForeground(`#${fields.map((x) => toHex2(Number(x.value) || 0)).join('')}`));
+  app.on('state', sync);
+  sync();
+  paintShade();
+  return h('div.color-panel',
+    h('div.color-chips', small, big),
+    shade, ramp,
+    h('div.color-fields', h('span.field-tag', '#'), hex, ...fields.flatMap((f, i) => [h('span.field-tag', 'RGB'[i]!), f])));
+}
+
+const SWATCHES = ['#000000', '#ffffff', '#7f7f7f', '#c3c3c3', '#ff0000', '#ff7f00', '#ffff00', '#7fff00', '#00ff00', '#00ff7f', '#00ffff', '#007fff', '#0000ff', '#7f00ff', '#ff00ff', '#ff007f', '#7f0000', '#7f3f00', '#7f7f00', '#3f7f00', '#007f00', '#007f3f', '#007f7f', '#003f7f', '#00007f', '#3f007f', '#7f007f', '#7f003f', '#f4cccc', '#fce5cd', '#fff2cc', '#d9ead3', '#d0e0e3', '#cfe2f3', '#d9d2e9', '#ead1dc'];
+
+function swatchesView(app: App): HTMLElement {
+  return h('div.swatch-grid', SWATCHES.map((c) =>
+    h('button.swatch', { title: `${c} — ${t('click: foreground · Alt+click: background')}`, style: { background: c }, onclick: (e: MouseEvent) => (e.altKey ? app.setBackground(c) : app.setForeground(c)) })));
 }
 
 function layersView(app: App): HTMLElement {

@@ -1,13 +1,13 @@
 /* PhotoDesign design tokens: the Lunatic Design dark palette. */
 :root {
-  --bg: #141414;          /* app backdrop, gaps between cards */
-  --canvas: #1b1b1b;      /* canvas surround */
-  --card: #222222;        /* floating cards */
-  --card-2: #2a2a2a;      /* raised rows, inputs hover */
-  --field: #161616;       /* inputs */
-  --hover: #333333;
-  --line: #0c0c0c;
-  --line-soft: #343434;
+  --bg: #161616;          /* menu bar, status bar, seams between docked strips */
+  --canvas: #202020;      /* workspace around the image */
+  --card: #262626;        /* docked panels and strips */
+  --card-2: #2f2f2f;      /* panel headers, raised rows */
+  --field: #1b1b1b;       /* inputs */
+  --hover: #3a3a3a;
+  --line: #0e0e0e;
+  --line-soft: #383838;
   --text: #f0f0f0;
   --text-dim: #bdbdbd;
   --text-faint: #8a8a8a;
@@ -16,10 +16,10 @@
   --sel: #2d8cf0;
   --sel-soft: rgba(45, 140, 240, 0.18);
   --danger: #ec5b62;
-  --radius: 12px;
-  --radius-sm: 8px;
-  --radius-xs: 6px;
-  --gap: 8px;
+  --radius: 3px;
+  --radius-sm: 3px;
+  --radius-xs: 2px;
+  --gap: 1px;
   --shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
   --font: 'Segoe UI Variable', 'Segoe UI', 'Inter', system-ui, -apple-system, Roboto, 'Leelawadee UI', 'Noto Sans Thai', 'Sarabun', Tahoma, sans-serif;
   --mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
