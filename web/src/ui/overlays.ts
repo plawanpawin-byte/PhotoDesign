@@ -146,13 +146,35 @@ export function commandPalette(app: App, close: () => void): HTMLElement {
   return el;
 }
 
+/** The panels a Window menu can bring forward: group tab ids and their names. */
+const PANELS: readonly [string, string][] = [['color', 'Color'], ['swatches', 'Swatches'], ['image', 'Properties'], ['adjust', 'Adjustments'], ['history', 'History'], ['layers', 'Layers']];
+
+/** Menus the interface owns rather than the engine: Window shows panels, Help points at the shortcuts. */
+export const CLIENT_MENUS = ['Window', 'Help'] as const;
+
+function clientMenu(app: App, name: string): MenuNode | undefined {
+  const item = (id: string, label: string, run: () => void, shortcut?: string) => ({ id, label: t(label), menu: [name], params: '{}', enabled: true, shortcut, run });
+  const entries =
+    name === 'Window' ? PANELS.map(([tab, label]) => item(`window.${tab}`, label, () => document.querySelector<HTMLButtonElement>(`.seg[data-tab="${tab}"]`)?.click()))
+    : name === 'Help' ? [
+      item('help.actions', 'Find an action…', () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true })), 'Ctrl+K'),
+      item('help.about', 'About PhotoDesign', () => app.notify(t('PhotoDesign — free and open source photo editor. Engine in Rust, interface in TypeScript.'))),
+    ]
+    : null;
+  if (!entries) return undefined;
+  clientRuns.clear();
+  for (const e of entries) clientRuns.set(e.id, e.run);
+  return { name, children: [], commands: entries.map(({ run: _run, ...c }) => c as unknown as CommandInfo) };
+}
+const clientRuns = new Map<string, () => void>();
+
 /** One menu-bar menu as a drop-down; submenus open to the side on hover. */
 export function menuDropdown(app: App, name: string, anchor: HTMLElement, close: () => void): HTMLElement {
-  const node = buildMenuTree(app.commands()).find((n) => n.name === name);
+  const node = buildMenuTree(app.commands()).find((n) => n.name === name) ?? clientMenu(app, name);
   const list = (n: MenuNode): HTMLElement => {
     const el = h('div.menu-list', { role: 'menu' });
     for (const c of n.commands)
-      el.append(h('button.menu-item', { role: 'menuitem', disabled: !c.enabled, title: c.disabledReason ?? '', onclick: () => { close(); app.run(c.id); } }, h('span', c.label), c.shortcut ? h('span.menu-hint', c.shortcut.replace('Cmd', 'Ctrl')) : null));
+      el.append(h('button.menu-item', { role: 'menuitem', disabled: !c.enabled, title: c.disabledReason ?? '', onclick: () => { close(); const own = clientRuns.get(c.id); if (own) own(); else app.run(c.id); } }, h('span', c.label), c.shortcut ? h('span.menu-hint', c.shortcut.replace('Cmd', 'Ctrl')) : null));
     if (n.commands.length && n.children.length) el.append(h('div.menu-sep'));
     for (const child of n.children)
       el.append(h('div.menu-sub-row', h('div.menu-item.has-sub', h('span', t(child.name)), icon(ICONS.chevron, 12)), h('div.menu-fly', list(child))));

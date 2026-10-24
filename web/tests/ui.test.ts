@@ -87,7 +87,7 @@ describe('interface', () => {
     const { root, app, engine } = setup();
     app.newDocument({ width: 20, height: 20 });
     const items = [...root.querySelectorAll<HTMLButtonElement>('.menubar-item')];
-    expect(items.map((b) => b.textContent)).toEqual(['File', 'Image', 'Filter']);
+    expect(items.map((b) => b.textContent)).toEqual(['File', 'Image', 'Filter', 'Window', 'Help']);
     items[1]!.click();
     const drop = root.querySelector('.menu-drop')!;
     expect(drop.querySelector('.menu-item.has-sub')?.textContent).toBe('Adjustments');
@@ -100,6 +100,9 @@ describe('interface', () => {
     key('keydown', 'Escape');
     expect(root.querySelector('.menu-drop')).toBeNull();
     expect(root.querySelectorAll('.panel-group')).toHaveLength(3);
+    items[3]!.click();
+    [...root.querySelectorAll<HTMLButtonElement>('.menu-drop .menu-item')].find((b) => b.textContent === 'History')!.click();
+    expect(root.querySelector('.panel-group[data-group="middle"] .seg.active')?.textContent).toBe('History');
     expect(root.querySelector('.panel-group[data-group="bottom"] .seg.active')?.textContent).toBe('Layers');
     root.querySelector<HTMLButtonElement>('.seg[data-tab="layers"]')!.click();
     expect(root.querySelectorAll('.layer-row')).toHaveLength(1);

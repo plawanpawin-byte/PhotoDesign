@@ -6,6 +6,7 @@ import { nextBrushSize } from '../lib/keys';
 import { centre, formatZoom, stepZoom, zoomAt } from '../lib/viewport';
 import { TOOLS, toolDef } from '../tools/tools';
 import { buildMenuTree } from '../lib/menu-tree';
+import { CLIENT_MENUS } from './overlays';
 import { clear, h, icon } from './dom';
 import { ICONS, type IconName } from './icons';
 
@@ -30,7 +31,8 @@ export function menuBar(app: App, actions: ChromeActions): HTMLElement {
   const exportBtn = h('button.bar-btn', { onclick: (e: MouseEvent) => { e.stopPropagation(); exportMenu.hidden = !exportMenu.hidden; } }, icon(ICONS.export, 14), t('Export'));
   document.addEventListener('click', () => (exportMenu.hidden = true));
   const search = h('button.search-btn', { onclick: () => actions.openPalette(), title: t('Find any action (Ctrl+K)') }, icon(ICONS.search, 13), h('span', t('Find an action…')), h('kbd', 'Ctrl K'));
-  const names = buildMenuTree(app.commands()).map((n) => n.name);
+  const engineMenus = buildMenuTree(app.commands()).map((n) => n.name);
+  const names = [...engineMenus, ...CLIENT_MENUS.filter((m) => !engineMenus.includes(m))];
   const items = names.map((name) =>
     h('button.menubar-item', { dataset: { menu: name }, onclick: (e: MouseEvent) => actions.openMenu(name, e.currentTarget as HTMLElement) }, t(name)));
   const render = () => {
