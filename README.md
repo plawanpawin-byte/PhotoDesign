@@ -1,8 +1,32 @@
+<div align="center">
+
+<img src="assets/photodesign-logo.webp" alt="PhotoDesign logo" width="120" />
+
 # PhotoDesign
 
-A free, open-source image editor in pure Rust (egui on wgpu): layers, masks, adjustment layers,
-layer styles, type, vectors, brushes and PSD files. Every action is a command, so the UI, the CLI
-and agents drive the same engine.
+**A free, open-source photo editor.**
+
+Layers, masks, adjustments, filters, brushes, type and PSD files in one dark workspace.
+Every edit is a command, so the interface, the command line and AI agents share one engine.
+Nothing is uploaded: your work stays on your computer.
+
+[![Run from source](https://img.shields.io/badge/Run-from%20source-3b82f6?style=for-the-badge)](#build-and-run)
+&nbsp;
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-22c55e?style=for-the-badge)](LICENSE-MIT)
+
+![Platforms](https://img.shields.io/badge/platforms-Electron%20%C2%B7%20browser-64748b?style=flat-square)
+
+</div>
+
+## Two apps, one family
+
+<table>
+  <tr>
+    <td width="50%" align="center"><img src="assets/lunaticdesign-logo.png" alt="lunaticDesign logo" width="96" /><br/><b>lunaticDesign</b><br/>A free, open-source vector, pixel and layout editor.<br/><sub>Design: shapes, pages, type and slices.</sub><br/><br/><a href="https://github.com/plawanpawin-byte/vectoredit"><img src="https://img.shields.io/badge/Open-lunaticDesign-3b82f6?style=flat-square" alt="Open lunaticDesign" /></a></td>
+    <td width="50%" align="center"><img src="assets/photodesign-logo.webp" alt="PhotoDesign logo" width="96" /><br/><b>PhotoDesign</b><br/>A free, open-source photo editor.<br/><sub>Photos: layers, adjustments, filters and brushes.</sub><br/><br/><a href="#build-and-run"><img src="https://img.shields.io/badge/Open-PhotoDesign-3b82f6?style=flat-square" alt="Open PhotoDesign" /></a></td>
+  </tr>
+</table>
+
 
 PhotoDesign starts from [PhotoCraft](https://getartcraft.com/apps/photocraft) 0.15.1 by the ArtCraft
 Team and its contributors (MIT OR Apache-2.0) and is being shaped with the look of Lunatic Design.
