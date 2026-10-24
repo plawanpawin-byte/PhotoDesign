@@ -231,6 +231,25 @@ export const ADJUST_GROUPS: readonly AdjustGroup[] = [
     { key: 'amount', label: 'Amount', min: 1, max: 500, step: 1, value: 80 },
     { key: 'radius', label: 'Radius', min: 0.1, max: 50, step: 0.1, value: 1.5 },
   ] },
+  { title: 'Levels', note: 'Black point, midtones, white point', command: 'image.adjustments.levels', controls: [
+    { key: 'inBlack', label: 'Shadows', min: 0, max: 253, step: 1, value: 0 },
+    { key: 'gamma', label: 'Midtones', min: 0.1, max: 9.99, step: 0.01, value: 1 },
+    { key: 'inWhite', label: 'Highlights', min: 2, max: 255, step: 1, value: 255 },
+    { key: 'outBlack', label: 'Output black', min: 0, max: 255, step: 1, value: 0 },
+    { key: 'outWhite', label: 'Output white', min: 0, max: 255, step: 1, value: 255 },
+  ] },
+  { title: 'Threshold', note: 'Pure black and white', command: 'image.adjustments.threshold', controls: [
+    { key: 'level', label: 'Level', min: 1, max: 255, step: 1, value: 128 },
+  ] },
+  { title: 'Posterize', note: 'Fewer tones per channel', command: 'image.adjustments.posterize', controls: [
+    { key: 'levels', label: 'Levels', min: 2, max: 255, step: 1, value: 4 },
+  ] },
+  { title: 'Noise', note: 'Add grain', command: 'filter.noise.addNoise', controls: [
+    { key: 'amount', label: 'Amount', min: 0.1, max: 400, step: 0.1, value: 12.5 },
+  ] },
+  { title: 'Median', note: 'Remove specks, keep edges', command: 'filter.noise.median', controls: [
+    { key: 'radius', label: 'Radius', min: 1, max: 64, step: 1, value: 1 },
+  ] },
   { title: 'Mosaic', note: 'Flat blocks of colour', command: 'filter.pixelate.mosaic', controls: [
     { key: 'cellSize', label: 'Cell size', min: 2, max: 200, step: 1, value: 10 },
   ] },

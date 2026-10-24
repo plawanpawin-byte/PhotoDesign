@@ -325,6 +325,108 @@ pub fn high_pass(px: &mut [u8], width: usize, height: usize, radius: f64) {
     }
 }
 
+/// Levels on 0..255 values: input black/white points, midtone gamma, then the output range.
+pub fn levels(px: &mut [u8], in_black: f64, in_white: f64, gamma: f64, out_black: f64, out_white: f64) {
+    let span = (in_white - in_black).max(1.0);
+    let gamma = if gamma.is_finite() && gamma > 0.0 { gamma } else { 1.0 };
+    let lut: Vec<u8> = (0..256)
+        .map(|v| {
+            let t = ((f64::from(v) - in_black) / span).clamp(0.0, 1.0).powf(1.0 / gamma);
+            clamp8(out_black + t * (out_white - out_black))
+        })
+        .collect();
+    for p in px.chunks_exact_mut(4) {
+        for c in &mut p[..3] {
+            *c = lut[usize::from(*c)];
+        }
+    }
+}
+
+/// Black where the pixel's luma is below `level`, white from it up.
+pub fn threshold(px: &mut [u8], level: f64) {
+    for p in px.chunks_exact_mut(4) {
+        let v = if luma(f64::from(p[0]), f64::from(p[1]), f64::from(p[2])) >= level { 255 } else { 0 };
+        p[..3].fill(v);
+    }
+}
+
+/// `levels` evenly spaced tones per channel (2 to 255).
+pub fn posterize(px: &mut [u8], levels: f64) {
+    let n = levels.round().clamp(2.0, 255.0);
+    let step = 255.0 / (n - 1.0);
+    for p in px.chunks_exact_mut(4) {
+        for c in &mut p[..3] {
+            *c = clamp8((f64::from(*c) / step).round() * step);
+        }
+    }
+}
+
+/// Uniform noise of `amount` percent, the same for every redraw of the same pixel (a hash, not a
+/// random generator), so a slider drag doesn't shimmer.
+pub fn add_noise(px: &mut [u8], width: usize, amount: f64) {
+    let spread = amount.clamp(0.0, 400.0) / 100.0 * 255.0;
+    for (i, p) in px.chunks_exact_mut(4).enumerate() {
+        let (x, y) = (i % width.max(1), i / width.max(1));
+        for (c, v) in p[..3].iter_mut().enumerate() {
+            let mut hsh = (x as u32).wrapping_mul(0x9E37_79B1) ^ (y as u32).wrapping_mul(0x85EB_CA77) ^ (c as u32).wrapping_mul(0xC2B2_AE3D);
+            hsh ^= hsh >> 15;
+            hsh = hsh.wrapping_mul(0x2C1B_3C6D);
+            hsh ^= hsh >> 12;
+            let unit = f64::from(hsh & 0xFFFF) / 65535.0 - 0.5;
+            *v = clamp8(f64::from(*v) + unit * spread);
+        }
+    }
+}
+
+/// Median of each channel over a (2r+1)-square window: removes specks, keeps edges. A running
+/// histogram along each row keeps it at O(r) per pixel.
+pub fn median(px: &mut [u8], width: usize, height: usize, radius: f64) {
+    let r = radius.round().clamp(0.0, 64.0) as usize;
+    if r == 0 || width == 0 || height == 0 || px.len() < width * height * 4 {
+        return;
+    }
+    let src = px.to_vec();
+    let window = |x0: usize, x1: usize, y: usize| (x0..=x1, y.saturating_sub(r)..=(y + r).min(height - 1));
+    for c in 0..3 {
+        for y in 0..height {
+            let mut hist = [0u32; 256];
+            let mut count = 0u32;
+            let (xs, ys) = window(0, r.min(width - 1), y);
+            for yy in ys.clone() {
+                for xx in xs.clone() {
+                    hist[usize::from(src[(yy * width + xx) * 4 + c])] += 1;
+                    count += 1;
+                }
+            }
+            for x in 0..width {
+                if x > 0 {
+                    if x > r {
+                        for yy in ys.clone() {
+                            hist[usize::from(src[(yy * width + x - r - 1) * 4 + c])] -= 1;
+                            count -= 1;
+                        }
+                    }
+                    if x + r < width {
+                        for yy in ys.clone() {
+                            hist[usize::from(src[(yy * width + x + r) * 4 + c])] += 1;
+                            count += 1;
+                        }
+                    }
+                }
+                let half = count.div_ceil(2);
+                let mut seen = 0;
+                for (v, n) in hist.iter().enumerate() {
+                    seen += n;
+                    if seen >= half {
+                        px[(y * width + x) * 4 + c] = v as u8;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}
+
 pub fn preview(command: &str, values: &Values, px: &mut [u8], width: usize, height: usize, scale: f64) -> bool {
     match command {
         "image.adjustments.brightnessContrast" => brightness_contrast(px, get(values, "brightness", 0.0), get(values, "contrast", 0.0)),
@@ -333,6 +435,11 @@ pub fn preview(command: &str, values: &Values, px: &mut [u8], width: usize, heig
         "image.adjustments.vibrance" => vibrance(px, get(values, "vibrance", 0.0)),
         "filter.blur.gaussianBlur" => gaussian_blur(px, width, height, get(values, "radius", 0.0) * scale),
         "filter.sharpen.unsharpMask" => unsharp_mask(px, width, height, get(values, "amount", 0.0), get(values, "radius", 1.0) * scale),
+        "image.adjustments.levels" => levels(px, get(values, "inBlack", 0.0), get(values, "inWhite", 255.0), get(values, "gamma", 1.0), get(values, "outBlack", 0.0), get(values, "outWhite", 255.0)),
+        "image.adjustments.threshold" => threshold(px, get(values, "level", 128.0)),
+        "image.adjustments.posterize" => posterize(px, get(values, "levels", 4.0)),
+        "filter.noise.addNoise" => add_noise(px, width, get(values, "amount", 12.5)),
+        "filter.noise.median" => median(px, width, height, get(values, "radius", 1.0) * scale),
         "filter.pixelate.mosaic" => mosaic(px, width, height, get(values, "cellSize", 10.0) * scale),
         "filter.stylize.emboss" => emboss(px, width, height, get(values, "angle", 135.0), get(values, "height", 3.0) * scale, get(values, "amount", 100.0)),
         "filter.other.highPass" => high_pass(px, width, height, get(values, "radius", 10.0) * scale),
@@ -483,26 +590,73 @@ mod tests {
 
     #[test]
     fn emboss_is_flat_grey_on_flat_colour_and_marks_edges() {
-        let mut flat = vec![50, 90, 200, 255].repeat(16);
+        let mut flat = [50, 90, 200, 255].repeat(16);
         emboss(&mut flat, 4, 4, 135.0, 1.0, 100.0);
         assert!(flat.chunks_exact(4).all(|p| p[0] == 128 && p[1] == 128 && p[2] == 128));
         let mut edge: Vec<u8> = (0..16).flat_map(|i| if i % 4 < 2 { [0, 0, 0, 255] } else { [255, 255, 255, 255] }).collect();
         emboss(&mut edge, 4, 4, 0.0, 1.0, 100.0);
-        assert_ne!(edge[4 + 4 * 0 + 0], 128);
+        assert_ne!(edge[4], 128);
     }
 
     #[test]
     fn high_pass_of_flat_colour_is_mid_grey() {
-        let mut px = vec![30, 120, 220, 255].repeat(25);
+        let mut px = [30, 120, 220, 255].repeat(25);
         high_pass(&mut px, 5, 5, 2.0);
         assert!(px.chunks_exact(4).all(|p| p[..3].iter().all(|v| v.abs_diff(128) <= 1)));
     }
 
     #[test]
     fn preview_knows_the_new_filters() {
-        let mut px = vec![10, 20, 30, 255].repeat(4);
-        for id in ["filter.pixelate.mosaic", "filter.stylize.emboss", "filter.other.highPass"] {
+        let mut px = [10, 20, 30, 255].repeat(4);
+        for id in ["filter.pixelate.mosaic", "filter.stylize.emboss", "filter.other.highPass", "image.adjustments.levels", "image.adjustments.threshold", "image.adjustments.posterize", "filter.noise.addNoise", "filter.noise.median"] {
             assert!(preview(id, &Values::new(), &mut px, 2, 2, 1.0), "{id}");
         }
+    }
+
+    #[test]
+    fn levels_stretch_and_gamma() {
+        let mut px = vec![64, 128, 192, 255];
+        levels(&mut px, 64.0, 192.0, 1.0, 0.0, 255.0);
+        assert_eq!(&px[..3], &[0, 128, 255]);
+        let mut mid = vec![128, 128, 128, 255];
+        levels(&mut mid, 0.0, 255.0, 2.0, 0.0, 255.0);
+        assert!(mid[0] > 170, "{mid:?}");
+        let mut out = vec![0, 255, 0, 255];
+        levels(&mut out, 0.0, 255.0, 1.0, 20.0, 200.0);
+        assert_eq!(&out[..2], &[20, 200]);
+    }
+
+    #[test]
+    fn threshold_and_posterize() {
+        let mut px = vec![10, 10, 10, 255, 240, 240, 240, 255];
+        threshold(&mut px, 128.0);
+        assert_eq!(px, vec![0, 0, 0, 255, 255, 255, 255, 255]);
+        let mut p = vec![100, 30, 200, 255];
+        posterize(&mut p, 2.0);
+        assert_eq!(&p[..3], &[0, 0, 255]);
+    }
+
+    #[test]
+    fn noise_is_stable_and_bounded() {
+        let mut a = vec![128; 64];
+        let mut b = vec![128; 64];
+        add_noise(&mut a, 4, 50.0);
+        add_noise(&mut b, 4, 50.0);
+        assert_eq!(a, b);
+        assert!(a.chunks_exact(4).any(|p| p[0] != 128));
+        let mut none = vec![77; 16];
+        add_noise(&mut none, 2, 0.0);
+        assert!(none.iter().all(|v| *v == 77));
+    }
+
+    #[test]
+    fn median_removes_a_speck_and_keeps_flat_areas() {
+        let mut px = [50, 50, 50, 255].repeat(25);
+        px[12 * 4] = 255;
+        median(&mut px, 5, 5, 1.0);
+        assert!(px.chunks_exact(4).all(|p| p[0] == 50), "{px:?}");
+        let mut tiny = vec![9, 9, 9, 255];
+        median(&mut tiny, 1, 1, 3.0);
+        assert_eq!(tiny, vec![9, 9, 9, 255]);
     }
 }
