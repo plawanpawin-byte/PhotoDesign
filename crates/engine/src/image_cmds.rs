@@ -188,8 +188,38 @@ fn parse_resample(s: &str) -> Method {
     })
 }
 
-/// The largest raster Image Size resamples to: the decoders' default allocation budget.
-const MAX_RESAMPLE_BYTES: u64 = if cfg!(target_pointer_width = "64") { 8 << 30 } else { 2 << 30 };
+/// The largest raster Image Size resamples to: the decoders' default allocation budget. A web page
+/// (wasm32) has 4 GiB of address space and one thread: a raster near the old 2 GiB limit takes
+/// tens of seconds to resample with the window frozen, then often runs out of memory, so it is
+/// refused up front instead.
+pub(crate) const MAX_RESAMPLE_BYTES: u64 = if cfg!(target_arch = "wasm32") {
+    512 << 20
+} else if cfg!(target_pointer_width = "64") {
+    8 << 30
+} else {
+    2 << 30
+};
+
+/// Refuses a new `w` x `h` px document whose raster (`channels` x `bits`) would pass the budget a
+/// web page can hold, where creating and then editing it freezes the window (wasm32 only: the
+/// native app allocates it lazily and has the memory).
+pub(crate) fn check_new_document_budget(cmd: &str, w: u32, h: u32, bits: u32) -> Result<()> {
+    if !cfg!(target_arch = "wasm32") {
+        return Ok(());
+    }
+    check_new_document_against(cmd, w, h, bits, MAX_RESAMPLE_BYTES)
+}
+
+fn check_new_document_against(cmd: &str, w: u32, h: u32, bits: u32, budget: u64) -> Result<()> {
+    // Four channels is the most an RGB or CMYK document with its alpha holds.
+    let bpp = 4 * u64::from((bits / 8).max(1));
+    let px = u64::from(w).saturating_mul(u64::from(h));
+    if px.saturating_mul(bpp) <= budget {
+        return Ok(());
+    }
+    let max_mp = budget / bpp / 1_000_000;
+    Err(bad(cmd, format!("{w} x {h} px is {} megapixels; a document here is limited to {max_mp} megapixels at this bit depth. Choose a smaller size", px / 1_000_000)))
+}
 
 /// Image → Image Size.
 fn image_size(s: &mut Session, p: &Value) -> Result<Value> {
@@ -998,6 +1028,15 @@ pub fn specs() -> Vec<CommandSpec> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_new_document_over_the_budget_is_refused_before_it_is_made() {
+        let big = check_new_document_against("file.new", 100_000, 100_000, 8, 512 << 20).unwrap_err().to_string();
+        assert!(big.contains("megapixels") && big.contains("limited to 134"), "{big}");
+        assert!(check_new_document_against("file.new", 20_000, 20_000, 8, 512 << 20).is_err());
+        assert!(check_new_document_against("file.new", 10_000, 10_000, 8, 512 << 20).is_ok());
+        assert!(check_new_document_against("file.new", 10_000, 10_000, 16, 512 << 20).is_err(), "16-bit doubles the raster");
+    }
 
     #[test]
     fn crop_rejects_rectangles_that_would_wrap() {

@@ -80,4 +80,14 @@ describe.skipIf(!built)('wasm engine', () => {
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
   });
+
+  it('refuses sizes a web page cannot hold at once, instead of freezing for tens of seconds', async () => {
+    const e = await engine();
+    const t0 = Date.now();
+    expect(() => e.execute('file.new', { width: 100000, height: 100000 })).toThrow(/limited to 134 megapixels/);
+    e.execute('file.new', { width: 64, height: 64 });
+    expect(() => e.execute('image.imageSize', { width: 20000, height: 20000 })).toThrow(/limited to 134 megapixels/);
+    expect(Date.now() - t0).toBeLessThan(2000);
+    expect(e.state().document).not.toBeNull();
+  });
 });
