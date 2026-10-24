@@ -229,6 +229,14 @@ export function toolOptions(app: App): HTMLElement {
       el.append(select('Mode', MODES, app.select.mode, (v) => app.setSelect({ mode: v })), h('button.bar-btn.ghost-btn', { onclick: () => app.run('select.subject', { mode: app.select.mode }) }, t('Select Subject')));
     } else if (tool === 'type') {
       el.append(slider('Size', 4, 400, 1, r.typeSize, (v) => `${v}pt`, (v) => app.setRetouch({ typeSize: v })), h('span.opt-hint', `${t('Colour')} ${app.foreground}`));
+    } else if (tool === 'pen') {
+      el.append(select('Mode', [['shape', 'Shape'], ['path', 'Path']] as const, app.penMode, (v) => app.setPenMode(v)));
+      if (app.pen) {
+        el.append(h('span.opt-hint', `${app.pen.knots.length} ${t('points')} · ${t('Enter finishes, Esc cancels, Backspace removes the last')}`),
+          h('button.primary-btn.small', { onclick: () => app.finishPen(false) }, t('Finish')), h('button.ghost-btn', { onclick: () => app.cancelPen() }, t('Cancel')));
+      } else {
+        el.append(h('span.opt-hint', `${app.penMode === 'shape' ? `${t('Fill')} ${app.foreground} · ` : ''}${t(def.hint)}`));
+      }
     } else if (tool === 'lineShape') {
       el.append(slider('Weight', 1, 100, 1, r.lineWeight, (v) => `${v}px`, (v) => app.setRetouch({ lineWeight: v })), h('span.opt-hint', `${t('Fill')} ${app.foreground}`));
     } else if (tool === 'rectShape' || tool === 'ellipseShape') {
@@ -245,6 +253,7 @@ export function toolOptions(app: App): HTMLElement {
   };
   app.on('tool', render);
   app.on('crop', render);
+  app.on('pen', render);
   app.on('settings', () => {
     // Rebuild only when a value shown as text changed; a slider being dragged keeps its element.
     if (!el.contains(document.activeElement) || document.activeElement?.tagName !== 'INPUT') render();

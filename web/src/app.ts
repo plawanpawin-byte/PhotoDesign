@@ -5,7 +5,9 @@ import { t } from './lib/i18n';
 import type { CommandInfo, DocumentInfo, EngineApi, EngineState, LayerInfo, Preview } from './engine/types';
 import { toHex } from './lib/color';
 import { fit, type Size, type View } from './lib/viewport';
+import { commitCall, dragLastHandle, removeLastKnot, addKnot, type PenMode, type PenPath } from './tools/pen';
 import { ToolHand } from './tools/tools';
+import type { Point } from './lib/viewport';
 
 export interface BrushSettings {
   size: number;
@@ -19,7 +21,7 @@ export interface FillSettings {
   contiguous: boolean;
 }
 
-export type Topic = 'state' | 'view' | 'tool' | 'settings' | 'toast' | 'crop' | 'preview';
+export type Topic = 'state' | 'view' | 'tool' | 'settings' | 'toast' | 'crop' | 'preview' | 'pen';
 
 export type SelectMode = 'replace' | 'add' | 'subtract' | 'intersect';
 
@@ -85,6 +87,9 @@ export class App {
   cloneSource: { x: number; y: number } | null = null;
   /** The crop being drawn, in document pixels, until it is applied or cancelled. */
   cropRect: Rect | null = null;
+  /** The Pen tool's path while it is being drawn (document pixels), and where it goes when finished. */
+  pen: PenPath | null = null;
+  penMode: PenMode = 'shape';
   toasts: Toast[] = [];
   /** A live, not yet applied, adjustment shown on the canvas. */
   preview: Preview | null = null;
@@ -94,7 +99,11 @@ export class App {
   private fittedRevisionDoc: string | null = null;
 
   constructor(readonly engine: EngineApi) {
-    this.tools.onChange(() => this.emit('tool'));
+    this.tools.onChange(() => {
+      // Picking another tool finishes a path in progress, as Photoshop keeps the work path.
+      if (this.pen && this.tools.active !== 'pen') this.finishPen();
+      this.emit('tool');
+    });
     this.refresh();
   }
 
@@ -221,6 +230,51 @@ export class App {
   setCrop(rect: Rect | null) {
     this.cropRect = rect;
     this.emit('crop');
+  }
+
+  /** Pen: a click adds a corner anchor. */
+  penAdd(at: Point) {
+    this.pen = addKnot(this.pen, at);
+    this.emit('pen');
+  }
+
+  /** Pen: dragging after a click pulls the new anchor's curve handles out to `to`. */
+  penDrag(to: Point) {
+    if (!this.pen) return;
+    this.pen = dragLastHandle(this.pen, to);
+    this.emit('pen');
+  }
+
+  /** Pen: Backspace takes the last anchor away. */
+  penUndo() {
+    if (!this.pen) return;
+    this.pen = removeLastKnot(this.pen);
+    this.emit('pen');
+  }
+
+  /** Pen: throws the path away without making anything. */
+  cancelPen() {
+    if (!this.pen) return;
+    this.pen = null;
+    this.emit('pen');
+  }
+
+  /** Pen: makes the path (closed when `closed`) as a shape layer or the work path, per the mode. */
+  finishPen(closed = false) {
+    const path = this.pen;
+    if (!path) return;
+    const call = commitCall(path, closed, this.penMode, this.foreground);
+    this.pen = null;
+    this.emit('pen');
+    if (call) {
+      this.run(call[0], call[1]);
+      if (this.penMode === 'path') this.notify(t('Work path set'));
+    } else this.notify(t('A path needs at least two points'), 'error');
+  }
+
+  setPenMode(mode: PenMode) {
+    this.penMode = mode;
+    this.emit('settings');
   }
 
   /** Crops the document to the pending crop rectangle. */

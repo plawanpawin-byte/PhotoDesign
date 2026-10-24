@@ -4,6 +4,7 @@ import type { App, Rect } from '../app';
 import { bytesToHex, toHex } from '../lib/color';
 import { pan, stepZoom, toDoc, toScreen, zoomAt, type Point } from '../lib/viewport';
 import { clickCall, dragCall, strokeCall, type StrokeContext } from '../tools/commands';
+import { hitsFirst, segments } from '../tools/pen';
 import { STROKE_TOOLS, toolDef, type ToolId } from '../tools/tools';
 import { t } from '../lib/i18n';
 import { h } from './dom';
@@ -55,6 +56,8 @@ export function canvasView(app: App): HTMLElement {
   let pointer: Point | null = null;
   let stroke: Stroke | null = null;
   let drag: Drag | null = null;
+  /** Pen: the last anchor's handles follow the pointer while it is held down. */
+  let penDragging = false;
   let panning: { from: Point; pointerId: number; button: number } | null = null;
   let queued = false;
   let checker: CanvasPattern | null = null;
@@ -175,6 +178,7 @@ export function canvasView(app: App): HTMLElement {
     if (app.cropRect) drawCrop(ctx, app, app.cropRect);
     if (stroke && stroke.screen.length) drawStrokePreview(ctx, stroke, app);
     if (drag) drawDrag(ctx, drag, app);
+    if (app.pen) drawPen(ctx, app, pointer, penDragging);
     const tool = app.tools.active;
     if (pointer && STROKE_TOOLS.includes(tool) && !panning) {
       const r = Math.max(1, (app.brush.size * v.zoom) / 2);
@@ -239,6 +243,14 @@ export function canvasView(app: App): HTMLElement {
       app.notify(t('Source set'));
     } else if ((tool === 'cloneStamp' || tool === 'healing') && !app.cloneSource) {
       app.notify(t('Alt-click to set a source first'), 'error');
+    } else if (tool === 'pen') {
+      capture(e);
+      if (app.pen && hitsFirst(app.pen, p, (q) => toScreen(app.view, q))) {
+        app.finishPen(true);
+      } else {
+        app.penAdd(d);
+        penDragging = true;
+      }
     } else if (STROKE_TOOLS.includes(tool)) {
       capture(e);
       stroke = { tool, points: [], screen: [], erase: tool === 'eraser' || tool === 'backgroundEraser' };
@@ -270,7 +282,9 @@ export function canvasView(app: App): HTMLElement {
       panning.from = p;
       return;
     }
-    if (stroke) {
+    if (penDragging) {
+      app.penDrag(toDoc(app.view, p));
+    } else if (stroke) {
       const events = typeof e.getCoalescedEvents === 'function' ? e.getCoalescedEvents() : [];
       for (const ce of events.length ? events : [e]) {
         const cp = local(ce);
@@ -319,6 +333,7 @@ export function canvasView(app: App): HTMLElement {
       panning = null;
       updateCursor();
     }
+    penDragging = false;
     finishDrag(e);
     if (stroke) {
       const s = stroke;
@@ -399,12 +414,97 @@ export function canvasView(app: App): HTMLElement {
   app.on('settings', schedule);
   app.on('crop', schedule);
   app.on('preview', schedule);
+  app.on('pen', schedule);
   app.on('tool', () => {
     updateCursor();
     schedule();
   });
+  // Pen: Enter finishes the open path, Escape throws it away, Backspace takes the last point back.
+  const penKeys = (e: KeyboardEvent) => {
+    if (!stage.isConnected) return window.removeEventListener('keydown', penKeys);
+    if (!app.pen || app.tools.active !== 'pen') return;
+    const el = e.target as HTMLElement | null;
+    if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return;
+    if (e.key === 'Enter') app.finishPen(false);
+    else if (e.key === 'Escape') app.cancelPen();
+    else if (e.key === 'Backspace' || e.key === 'Delete') app.penUndo();
+    else return;
+    e.preventDefault();
+  };
+  window.addEventListener('keydown', penKeys);
   updateCursor();
   return stage;
+}
+
+/** The Pen tool's path: its outline, a rubber band to the pointer, and the anchors with their handles. */
+function drawPen(ctx: CanvasRenderingContext2D, app: App, pointer: Point | null, dragging: boolean) {
+  const path = app.pen;
+  if (!path) return;
+  const v = app.view;
+  const sc = (p: Point) => toScreen(v, p);
+  const trace = (from: Point, to: Point, c1?: Point, c2?: Point) => {
+    const a = sc(from);
+    const b = sc(to);
+    ctx.moveTo(a.x, a.y);
+    if (c1 && c2) ctx.bezierCurveTo(sc(c1).x, sc(c1).y, sc(c2).x, sc(c2).y, b.x, b.y);
+    else ctx.lineTo(b.x, b.y);
+  };
+  ctx.save();
+  ctx.lineJoin = 'round';
+  const outline = (width: number, style: string, dash: number[] = []) => {
+    ctx.lineWidth = width;
+    ctx.strokeStyle = style;
+    ctx.setLineDash(dash);
+    ctx.beginPath();
+    for (const s of segments(path, false)) trace(s.from, s.to, s.c1, s.c2);
+    ctx.stroke();
+  };
+  outline(3, 'rgba(0,0,0,0.55)');
+  outline(1.25, '#4da3ff');
+  // Where the next segment would go, as a dashed line to the pointer.
+  const last = path.knots.at(-1);
+  if (last && pointer && !dragging) {
+    const target = hitsFirst(path, pointer, sc) ? path.knots[0]!.anchor : null;
+    const a = sc(last.anchor);
+    const b = target ? sc(target) : pointer;
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = '#4da3ff';
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    if (last.out) ctx.bezierCurveTo(sc(last.out).x, sc(last.out).y, b.x, b.y, b.x, b.y);
+    else {
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+    }
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  path.knots.forEach((k, i) => {
+    const a = sc(k.anchor);
+    const isLast = i === path.knots.length - 1;
+    // Handles of the newest anchor (and any curved one) hang off it as thin lines with round tips.
+    for (const handle of [k.in, k.out]) {
+      if (!handle || !(isLast || k.in)) continue;
+      const hp = sc(handle);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = '#4da3ff';
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(hp.x, hp.y);
+      ctx.stroke();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(hp.x, hp.y, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = '#4da3ff';
+    ctx.fillStyle = isLast ? '#4da3ff' : '#fff';
+    ctx.fillRect(a.x - 3.5, a.y - 3.5, 7, 7);
+    ctx.strokeRect(a.x - 3.5, a.y - 3.5, 7, 7);
+  });
+  ctx.restore();
 }
 
 function outline(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, offset: number) {
