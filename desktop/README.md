@@ -38,5 +38,6 @@ run's artifacts. Pushing a `v*` tag also attaches them to a release.
 ## AI agents (MCP)
 
 Claude, Codex, Cursor and other MCP clients can drive the open window: every tool, filter and
-command, opening and saving files. `npm run cli` builds the MCP server; then Help › Connect AI
-agents (MCP)… shows the configuration to paste. Details: [MCP.md](MCP.md).
+command, opening and saving files. On Windows, after installing, run one PowerShell command
+(`PhotoDesign.exe --install-mcp`, see [MCP.md](MCP.md)) to connect Claude Code, Codex and
+Antigravity; Help › Connect AI agents (MCP)… shows it with a Copy button. Details: [MCP.md](MCP.md).

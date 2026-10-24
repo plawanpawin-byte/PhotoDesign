@@ -202,6 +202,7 @@ export const TH: Record<string, string> = {
   'About PhotoDesign': 'เกี่ยวกับ PhotoDesign',
   'Connect AI agents (MCP)…': 'เชื่อมต่อ AI (MCP)…',
   'Connect AI agents (MCP)': 'เชื่อมต่อ AI (MCP)',
+  'Windows: one command (PowerShell)': 'Windows: คำสั่งเดียว (PowerShell)',
   'AI agents connect through MCP and use the same tools as you, in this window. Files they open and save stay in:': 'AI เชื่อมต่อผ่าน MCP และใช้เครื่องมือชุดเดียวกับคุณในหน้าต่างนี้ ไฟล์ที่ AI เปิดและบันทึกจะอยู่ในโฟลเดอร์:',
   'MCP server not built yet. Run in the desktop folder:': 'ยังไม่ได้ build ตัว MCP server ให้รันในโฟลเดอร์ desktop:',
   'Agents connect to the desktop app. Open PhotoDesign with npm start in the desktop folder, or the installed app.': 'AI เชื่อมต่อได้เฉพาะแอพเดสก์ท็อป เปิด PhotoDesign ด้วย npm start ในโฟลเดอร์ desktop หรือแอพที่ติดตั้งแล้ว',

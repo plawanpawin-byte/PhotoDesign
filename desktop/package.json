@@ -24,6 +24,7 @@
     "files": [
       "main.cjs",
       "control.cjs",
+      "install-mcp.cjs",
       "preload.cjs",
       "icon.png",
       "icon.ico"

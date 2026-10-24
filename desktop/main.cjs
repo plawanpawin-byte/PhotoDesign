@@ -4,7 +4,10 @@ const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
-const { startControl } = require('./control.cjs');
+const { startControl, loadToken, tokenFile } = require('./control.cjs');
+
+// `PhotoDesign.exe --install-mcp` connects the AI agents installed on this computer, then exits.
+const INSTALL_MODE = process.argv.includes('--install-mcp');
 
 // Installed builds carry the interface in resources/web; from source it is web/dist.
 const dist = path.resolve(process.env.PHOTODESIGN_WEB_DIST || (app.isPackaged ? path.join(process.resourcesPath, 'web') : path.join(__dirname, '..', 'web', 'dist')));
@@ -90,8 +93,7 @@ function startAgents(win) {
     });
   };
   const root = path.resolve(process.env.PHOTODESIGN_AUTOMATION_ROOT || path.join(app.getPath('documents'), 'PhotoDesign'));
-  const exe = process.platform === 'win32' ? 'photodesign-cli.exe' : 'photodesign-cli';
-  const cli = app.isPackaged ? path.join(process.resourcesPath, 'bin', exe) : path.join(__dirname, 'bin', exe);
+  const cli = cliPath();
   const started = startControl({ port: Number(process.env.PHOTODESIGN_CONTROL_PORT || 7878), root, window: () => (win.isDestroyed() ? null : win), call });
   started.then(
     (c) => console.log(`PhotoDesign control: 127.0.0.1:${c.port}, token file ${c.tokenFile}, files in ${c.root}`),
@@ -103,7 +105,44 @@ function startAgents(win) {
   });
 }
 
+function cliPath() {
+  const exe = process.platform === 'win32' ? 'photodesign-cli.exe' : 'photodesign-cli';
+  return app.isPackaged ? path.join(process.resourcesPath, 'bin', exe) : path.join(__dirname, 'bin', exe);
+}
+
+async function runInstallMcp() {
+  const { installMcp } = require('./install-mcp.cjs');
+  const log = (text) => {
+    process.stdout.write(text);
+    fs.promises.writeFile(path.join(app.getPath('userData'), 'install-mcp.log'), text, 'utf8').catch(() => {});
+  };
+  // the portable build runs from a temporary copy, so an agent config pointing into it would break on the next start
+  if (process.env.PORTABLE_EXECUTABLE_FILE) {
+    log('PhotoDesign: the portable build cannot be connected to agents. Install with PhotoDesign-Setup and run this again.\n');
+    app.exit(1);
+    return;
+  }
+  const cli = cliPath();
+  if (!fs.existsSync(cli)) {
+    log(`PhotoDesign: the MCP server was not found at ${cli}. From source, run npm run cli in the desktop folder first.\n`);
+    app.exit(1);
+    return;
+  }
+  loadToken();
+  const port = Number(process.env.PHOTODESIGN_CONTROL_PORT || 7878);
+  const entry = { command: cli, args: ['mcp', '--bridge', `127.0.0.1:${port}`, '--control-token-file', tokenFile] };
+  const report = await installMcp({ home: app.getPath('home'), entry });
+  const lines = [
+    'PhotoDesign: connecting AI agents',
+    ...report.map((r) => (r.status === 'written' ? `  ${r.agent}: written to ${r.file}` : r.status === 'skipped' ? `  ${r.agent}: skipped (${r.reason})` : `  ${r.agent}: NOT written (${r.reason}) ${r.file}`)),
+    'Restart Claude Code, Codex or Antigravity, open PhotoDesign, then ask the agent to use the photodesign tools.',
+  ];
+  log(lines.join('\n') + '\n');
+  app.exit(report.some((r) => r.status === 'failed') ? 1 : 0);
+}
+
 app.whenReady().then(async () => {
+  if (INSTALL_MODE) return runInstallMcp();
   if (!fs.existsSync(path.join(dist, 'index.html'))) {
     const win = new BrowserWindow({ width: 760, height: 260, backgroundColor: '#222222' });
     win.removeMenu();

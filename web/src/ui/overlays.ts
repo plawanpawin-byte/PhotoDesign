@@ -72,6 +72,10 @@ export interface AgentInfo {
   cliFound: boolean;
 }
 
+/** One PowerShell line that connects Claude Code, Codex and Antigravity for the installed Windows app. */
+export const INSTALL_COMMAND =
+  '$exe = (Get-ChildItem "$env:LOCALAPPDATA\\Programs" -Filter "PhotoDesign.exe" -Recurse -EA 0 | Select-Object -First 1).FullName; & $exe --install-mcp';
+
 /** The MCP server's configuration for AI clients, ready to copy. */
 export function agentConfigs(info: AgentInfo): { name: string; text: string }[] {
   const args = ['mcp', '--bridge', `127.0.0.1:${info.port}`, '--control-token-file', info.tokenFile];
@@ -90,7 +94,7 @@ export function agentsDialog(info: AgentInfo | null, close: () => void): HTMLEle
         h('p', t('AI agents connect through MCP and use the same tools as you, in this window. Files they open and save stay in:')),
         h('code.agent-path', info.root),
         info.cliFound ? null : h('p.form-error', `${t('MCP server not built yet. Run in the desktop folder:')} npm run cli`),
-        ...agentConfigs(info).map(({ name, text }) => {
+        ...[{ name: t('Windows: one command (PowerShell)'), text: INSTALL_COMMAND }, ...agentConfigs(info)].map(({ name, text }) => {
           const pre = h('pre.agent-config', text);
           const copy = h('button.ghost-btn', { type: 'button', onclick: () => void navigator.clipboard?.writeText(text).then(() => (copy.textContent = t('Copied'))) }, t('Copy'));
           return h('div.agent-block', h('div.agent-head', h('b', name), copy), pre);

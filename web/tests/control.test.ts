@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { App } from '../src/app';
 import { handleControl } from '../src/control';
 import { mount } from '../src/main';
-import { agentConfigs } from '../src/ui/overlays';
+import { INSTALL_COMMAND, agentConfigs } from '../src/ui/overlays';
 import { FakeEngine } from './fake-engine';
 
 function setup() {
@@ -52,6 +52,7 @@ describe('control channel (AI agents)', () => {
 
   it('gives each AI client a configuration that starts the MCP bridge', () => {
     const configs = agentConfigs({ port: 7878, tokenFile: '/home/me/.photodesign/control.token', root: '/home/me/Documents/PhotoDesign', cli: '/opt/PhotoDesign/bin/photodesign-cli', cliFound: true });
+    expect(INSTALL_COMMAND).toContain('--install-mcp');
     expect(configs.map((c) => c.name)).toHaveLength(3);
     const json = JSON.parse(configs[0]!.text);
     expect(json.mcpServers.photodesign.args).toEqual(['mcp', '--bridge', '127.0.0.1:7878', '--control-token-file', '/home/me/.photodesign/control.token']);

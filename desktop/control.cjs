@@ -185,4 +185,4 @@ function startControl({ port, root, window, call }) {
   });
 }
 
-module.exports = { startControl, inside };
+module.exports = { startControl, inside, loadToken, tokenFile };

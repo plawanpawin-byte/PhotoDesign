@@ -27,7 +27,23 @@ cd desktop
 npm run cli
 ```
 
-Then in PhotoDesign open **Help › Connect AI agents (MCP)…**: it shows the exact configuration for
+### One command (Windows, installed app)
+
+Install `PhotoDesign-Setup`, then run this once in PowerShell and restart Claude Code, Codex or Antigravity:
+
+```
+$exe = (Get-ChildItem "$env:LOCALAPPDATA\Programs" -Filter "PhotoDesign.exe" -Recurse -EA 0 | Select-Object -First 1).FullName; & $exe --install-mcp
+```
+
+It adds `photodesign` to each agent's configuration, merging with what is there (other servers stay),
+keeps a `.bak` copy of every file it changes, and writes the result to `install-mcp.log` in the app's
+data folder. Agents that are not installed are skipped. From source the same works with
+`npx electron . --install-mcp` in `desktop`. The portable build cannot be connected this way (it runs
+from a temporary copy); use the installer.
+
+### By hand
+
+In PhotoDesign open **Help › Connect AI agents (MCP)…**: it shows the exact configuration for
 your machine, with Copy buttons, for:
 
 - **Claude Desktop, Cursor, Antigravity**: the `mcpServers` JSON block
