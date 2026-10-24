@@ -143,10 +143,27 @@ function layersView(app: App): HTMLElement {
     for (const l of layers) {
       const eye = h('button.layer-eye', { title: t(l.visible ? 'Hide' : 'Show'), onclick: (e: MouseEvent) => { e.stopPropagation(); app.run('layer.setProps', { layer: l.id, visible: !l.visible }); } }, icon(l.visible ? ICONS.eye : ICONS.eyeOff, 15));
       const name = h('span.layer-name', l.name);
+      // Rename in place (Electron has no window.prompt): Enter or leaving the field keeps it, Escape cancels.
       name.addEventListener('dblclick', (e) => {
         e.stopPropagation();
-        const next = window.prompt(t('Layer name'), l.name);
-        if (next && next.trim() && next !== l.name) app.run('layer.setProps', { layer: l.id, name: next.trim() });
+        const field = h('input.layer-rename', { type: 'text', value: l.name, 'aria-label': t('Layer name') }) as HTMLInputElement;
+        let done = false;
+        const finish = (keep: boolean) => {
+          if (done) return;
+          done = true;
+          const next = field.value.trim();
+          field.replaceWith(name);
+          if (keep && next && next !== l.name) app.run('layer.setProps', { layer: l.id, name: next });
+        };
+        field.addEventListener('keydown', (ev) => {
+          ev.stopPropagation();
+          if (ev.key === 'Enter') finish(true);
+          else if (ev.key === 'Escape') finish(false);
+        });
+        field.addEventListener('blur', () => finish(true));
+        field.addEventListener('click', (ev) => ev.stopPropagation());
+        name.replaceWith(field);
+        field.select();
       });
       const row = h('li.layer-row', { role: 'option', 'aria-selected': String(l.id === doc.activeLayer), class: [l.id === doc.activeLayer ? 'active' : '', l.visible ? '' : 'hidden-layer'].join(' '), style: { paddingLeft: `${8 + depth * 14}px` }, title: `${l.kind} ${t('layer — double-click the name to rename')}` },
         eye, h('span.layer-kind', kindBadge(l.kind)), name, l.opacity < 1 ? h('span.layer-meta', `${Math.round(l.opacity * 100)}%`) : null, l.blend !== 'Normal' ? h('span.layer-meta', l.blend) : null);

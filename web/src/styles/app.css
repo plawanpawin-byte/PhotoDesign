@@ -304,3 +304,4 @@ input[type='checkbox'] { accent-color: var(--brand); }
 .brand-logo { display: block; width: 18px; height: 18px; border-radius: 4px; }
 .welcome-logo { display: block; width: 64px; height: 64px; border-radius: 14px; }
 .boot-logo { border-radius: 20px; }
+.layer-rename { flex: 1; min-width: 0; height: 22px; padding: 0 4px; background: var(--field); border: 1px solid var(--brand); color: var(--text); font: inherit; }

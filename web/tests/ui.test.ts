@@ -122,6 +122,12 @@ describe('interface', () => {
     expect(root.querySelectorAll('.layer-row')).toHaveLength(2);
     root.querySelector<HTMLButtonElement>('.layer-eye')!.click();
     expect(engine.calls.at(-1)).toEqual(['layer.setProps', { layer: 2, visible: false }]);
+    root.querySelector('.layer-name')!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    const field = root.querySelector<HTMLInputElement>('.layer-rename')!;
+    field.value = 'Sky';
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    expect(engine.calls.at(-1)?.[0]).toBe('layer.setProps');
+    expect(engine.calls.at(-1)?.[1]).toMatchObject({ name: 'Sky' });
   });
 
   it('shortcuts stay out of text fields', () => {
