@@ -11,6 +11,6 @@ const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const run = (cmd, args, cwd) => execFileSync(cmd, args, { cwd, stdio: 'inherit', shell: process.platform === 'win32' });
 
 if (!existsSync(join(web, 'node_modules'))) run(npm, ['install'], web);
-if (!existsSync(join(web, 'src', 'engine', 'pkg', 'photodesign_wasm.js'))) run(npm, ['run', 'engine'], web);
+if (!existsSync(join(web, 'src', 'engine', 'pkg', 'photodesign_wasm.js'))) run(npm, ['run', 'engine', '--', '--fast'], web);
 if (!existsSync(join(web, 'dist', 'index.html'))) run(npm, ['run', 'build'], web);
 run(npm, ['exec', '--', 'electron', '.'], desktop);

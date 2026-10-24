@@ -89,6 +89,15 @@ debug = "line-tables-only"
 lto = "thin"
 codegen-units = 1
 
+# The desktop window's engine (`npm start` in desktop/): the release code paths without the
+# whole-program optimisation, so the first build takes minutes less.
+[profile.wasm-fast]
+inherits = "release"
+opt-level = 2
+lto = false
+codegen-units = 16
+strip = "debuginfo"
+
 # The browser build (apps/photocraft-web, `data-cargo-profile` in its index.html). Hosts cap the
 # size of a single file (Cloudflare Pages/Workers: 25 MiB), and the wasm is downloaded on every
 # visit, so this profile optimizes for size: fat LTO, opt-level "z" for PhotoCraft's own crates,
