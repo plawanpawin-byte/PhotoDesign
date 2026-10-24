@@ -25,7 +25,7 @@ interface PointerStep {
 }
 
 const MODIFIERS = ['shift', 'alt', 'command', 'ctrl', 'space'] as const;
-const SET_FIELDS = ['tool', 'zoom', 'fit', 'center', 'brushSize', 'selectionMode'];
+const SET_FIELDS = ['tool', 'zoom', 'fit', 'center', 'brushSize', 'brushHardness', 'brushOpacity', 'brushFlow', 'selectionMode'];
 const SELECTION_MODES = ['replace', 'add', 'subtract', 'intersect'] as const;
 
 function encode(bytes: Uint8Array): string {
@@ -76,6 +76,12 @@ function setUi(app: App, p: Record<string, any>) {
   if (p.brushSize !== undefined) {
     if (typeof p.brushSize !== 'number' || p.brushSize < 1 || p.brushSize > 5000) fail('ui.set: brushSize must be a number 1..5000');
     app.setBrush({ size: p.brushSize });
+  }
+  // Hardness, opacity and flow are percentages, as the options bar shows them.
+  for (const [field, key] of [['brushHardness', 'hardness'], ['brushOpacity', 'opacity'], ['brushFlow', 'flow']] as const) {
+    if (p[field] === undefined) continue;
+    if (typeof p[field] !== 'number' || p[field] < 0 || p[field] > 100) fail(`ui.set: ${field} must be a number 0..100 (percent)`);
+    app.setBrush({ [key]: p[field] / 100 });
   }
   if (p.selectionMode !== undefined) {
     const mode = typeof p.selectionMode === 'number' ? SELECTION_MODES[p.selectionMode] : p.selectionMode;
@@ -154,6 +160,9 @@ export async function handleControl(app: App, req: ControlRequest): Promise<unkn
       return inspect(app);
     case 'engine.commands':
       return app.engine.commands();
+    case 'ui.menu.list':
+      // The menu tree is the commands' own menu paths, so it lists everything a menu can run.
+      return { items: app.engine.commands().map((c) => ({ id: c.id, label: c.label, menu: c.menu, shortcut: c.shortcut ?? null, enabled: c.enabled, disabledReason: c.disabledReason ?? null })) };
     case 'engine.execute':
     case 'ui.menu.invoke': {
       const id = String(p.command ?? p.id ?? fail(`${req.method}: \`command\` is required`));
@@ -183,6 +192,14 @@ export async function handleControl(app: App, req: ControlRequest): Promise<unkn
     case 'app.openBytes': {
       const name = String(p.name ?? fail('app.openBytes: name is required'));
       const result = app.engine.open(name, decode(String(p.base64 ?? '')));
+      app.refresh();
+      return result ?? null;
+    }
+    case 'app.placeBytes': {
+      if (!app.doc) fail('doc_place: no document is open (create or open one first)');
+      const name = String(p.name ?? fail('app.placeBytes: name is required'));
+      const { name: _n, base64, ...options } = p;
+      const result = app.engine.place(name, decode(String(base64 ?? '')), options);
       app.refresh();
       return result ?? null;
     }

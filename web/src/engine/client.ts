@@ -11,6 +11,7 @@ export interface RawImaging {
 interface RawEngine {
   execute(id: string, params: string): string;
   open(name: string, bytes: Uint8Array): string;
+  place(name: string, bytes: Uint8Array, params: string): string;
   state(): string;
   commands(): string;
   revision(): number;
@@ -53,6 +54,14 @@ export class EngineClient implements EngineApi {
       return JSON.parse(this.raw.open(name, bytes));
     } catch (e) {
       throw new EngineError('open', message(e));
+    }
+  }
+
+  place(name: string, bytes: Uint8Array, params: Record<string, unknown> = {}): unknown {
+    try {
+      return JSON.parse(this.raw.place(name, bytes, JSON.stringify(params)));
+    } catch (e) {
+      throw new EngineError('place', message(e));
     }
   }
 

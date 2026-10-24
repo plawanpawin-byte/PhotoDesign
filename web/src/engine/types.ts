@@ -70,6 +70,7 @@ export interface Frame {
 export interface EngineApi {
   execute(id: string, params?: Record<string, unknown>): unknown;
   open(name: string, bytes: Uint8Array): unknown;
+  place(name: string, bytes: Uint8Array, params?: Record<string, unknown>): unknown;
   state(): EngineState;
   commands(): CommandInfo[];
   revision(): number;

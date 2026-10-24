@@ -320,7 +320,7 @@ pub struct UiSetParams {
     /// brushesView, brushPicker ([x, y] opens the Brush Preset picker there, null closes it),
     /// brushPickerName, brushPickerStroke, brushPickerTip (the picker card's parts, at least one
     /// on), brushPickerScale (the picker footer's card-scale slider, 0.15 to 2, 1 the standard),
-    /// brushSize, gradientBlendMode
+    /// brushSize, brushHardness, brushOpacity, brushFlow (percent, 0..100), gradientBlendMode
     /// (a blend mode name, for the Gradient tool), gradientClassic (bool), eyedropperSampleSize
     /// ("point" or 1, 3, 5, 11, 31, 51, 101), eyedropperSample (current, currentAndBelow, all,
     /// allNoAdjustments, currentAndBelowNoAdjustments), eyedropperRing (bool), cropOverlay (thirds,
@@ -796,7 +796,8 @@ impl PhotocraftMcp {
     async fn doc_select(&self, Parameters(p): Parameters<SelectParams>) -> Result<CallToolResult, McpError> {
         match self.headless_op(move |h| h.select(p.index)).await {
             Some(r) => to_result(r),
-            None => bridge_only_headless("doc_select"),
+            // The window's own commands: `document.activate` switches tab by index.
+            None => self.run_command("document.activate".into(), json!({"document": p.index}), true).await,
         }
     }
 
@@ -804,7 +805,10 @@ impl PhotocraftMcp {
     async fn doc_close(&self, Parameters(p): Parameters<DocIndex>) -> Result<CallToolResult, McpError> {
         match self.headless_op(move |h| h.close(p.index)).await {
             Some(r) => to_result(r),
-            None => bridge_only_headless("doc_close"),
+            None => {
+                let params = p.index.map_or_else(|| json!({}), |i| json!({"document": i}));
+                self.run_command("file.close".into(), params, true).await
+            }
         }
     }
 
@@ -967,10 +971,6 @@ impl PhotocraftMcp {
             None => bridge_only("control_call"),
         }
     }
-}
-
-fn bridge_only_headless(name: &str) -> Result<CallToolResult, McpError> {
-    Ok(fail(format!("`{name}` is only available in headless mode (in the GUI use the window/tab UI or control_call)")))
 }
 
 impl PhotocraftMcp {

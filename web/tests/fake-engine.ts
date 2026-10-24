@@ -40,6 +40,10 @@ export class FakeEngine implements EngineApi {
   open(name: string): unknown {
     return this.execute('file.new', { name, width: 10, height: 10 });
   }
+  place(name: string, _bytes: Uint8Array, params: Record<string, unknown> = {}): unknown {
+    this.calls.push(['file.placeEmbedded', { name, ...params }]);
+    return { layer: 1 };
+  }
   state(): EngineState {
     return {
       session: { active: this.doc ? 0 : null, documents: this.doc ? [{ index: 0, name: this.doc.name, width: this.doc.width, height: this.doc.height, dirty: false, revision: this.rev }] : [], foreground: this.fg, background: this.bg },

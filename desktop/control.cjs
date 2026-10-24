@@ -81,6 +81,16 @@ function startControl({ port, root, window, call }) {
         const result = await call('app.openBytes', { name: path.basename(file), base64: bytes.toString('base64') });
         return { ...(result && typeof result === 'object' ? result : {}), path: file, name: path.basename(file), warnings: [] };
       }
+      case 'engine.execute': {
+        // The engine reads an ambient path itself, which a window has no filesystem for: read it here, inside the root.
+        if (params.command === 'file.placeEmbedded' && params.params && typeof params.params.path === 'string') {
+          const { path: rel, ...options } = params.params;
+          const file = inside(root, rel, 'doc_place');
+          const result = await call('app.placeBytes', { ...options, name: path.basename(file), base64: fs.readFileSync(file).toString('base64') });
+          return { ...(result && typeof result === 'object' ? result : {}), path: file };
+        }
+        return call(method, params);
+      }
       case 'app.save': {
         const file = inside(root, params.path, 'app.save');
         const format = path.extname(file).slice(1).toLowerCase() || 'png';

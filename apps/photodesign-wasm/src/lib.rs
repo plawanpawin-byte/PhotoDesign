@@ -48,6 +48,12 @@ impl Studio {
         file_cmds::open_bytes_as(&mut self.session, name, bytes, None, None).map_err(|e| e.to_string())
     }
 
+    /// Places a file's bytes as a Smart Object layer in the active document; `params` carries the
+    /// command's own options (`scale`, `fit`, `center`).
+    pub fn place(&mut self, name: &str, bytes: Vec<u8>, params: &Value) -> Result<Value, String> {
+        file_cmds::place_bytes(&mut self.session, name, bytes, None, params).map_err(|e| e.to_string())
+    }
+
     /// Every command with its label, menu, shortcut, parameters and whether it can run now.
     pub fn commands(&self) -> Value {
         Value::Array(command_specs().iter().map(|c| commands::list_entry(&self.session, c, self.session.disabled_reason(c.id))).collect())
@@ -134,6 +140,10 @@ pub mod web {
         }
         pub fn open(&mut self, name: &str, bytes: &[u8]) -> Result<String, JsError> {
             self.studio.open(name, bytes).map(|v| v.to_string()).map_err(fail)
+        }
+        pub fn place(&mut self, name: &str, bytes: &[u8], params: &str) -> Result<String, JsError> {
+            let params: serde_json::Value = if params.trim().is_empty() { serde_json::json!({}) } else { serde_json::from_str(params).map_err(|e| fail(format!("place: the parameters are not JSON: {e}")))? };
+            self.studio.place(name, bytes.to_vec(), &params).map(|v| v.to_string()).map_err(fail)
         }
         pub fn commands(&self) -> String {
             self.studio.commands().to_string()

@@ -40,6 +40,19 @@ describe('control channel (AI agents)', () => {
     await expect(call(app, 'nope')).rejects.toThrow(/unknown method/);
   });
 
+  it('lists the menu tree, sets brush percentages and places bytes', async () => {
+    const { app, engine } = setup();
+    const menu = (await call(app, 'ui.menu.list')) as { items: { id: string; menu: string[] }[] };
+    expect(menu.items.some((i) => i.id === 'filter.blur.gaussianBlur' && i.menu[0] === 'Filter')).toBe(true);
+    await call(app, 'ui.set', { brushOpacity: 40, brushFlow: 25, brushHardness: 90 });
+    expect(app.brush).toMatchObject({ opacity: 0.4, flow: 0.25, hardness: 0.9 });
+    await expect(call(app, 'ui.set', { brushOpacity: 140 })).rejects.toThrow(/0\.\.100/);
+    await expect(call(app, 'app.placeBytes', { name: 'logo.png', base64: 'AAAA' })).rejects.toThrow(/no document/);
+    await call(app, 'engine.execute', { command: 'file.new', params: { width: 50, height: 50 } });
+    await call(app, 'app.placeBytes', { name: 'logo.png', base64: 'AAAA', scale: 50 });
+    expect(engine.calls.at(-1)).toEqual(['file.placeEmbedded', { name: 'logo.png', scale: 50 }]);
+  });
+
   it('plays pointer events through the active tool', async () => {
     const { app, engine } = setup();
     await call(app, 'engine.execute', { command: 'file.new', params: { width: 100, height: 100 } });
