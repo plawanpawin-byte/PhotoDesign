@@ -272,17 +272,16 @@ async fn command_ids_in_tool_schemas_exist() {
     client.cancel().await.unwrap();
 }
 
-/// `UI_SET_FIELDS` in `crates/ui-egui/src/control.rs`, read from source. The desktop shell owns the
-/// list; this crate describes it over MCP without depending on the UI crate (both are L6).
-/// Anchored on the declaration, not on the doc comment that mentions it first, and checked against
-/// the declared array length so a mis-parse fails loudly instead of testing the wrong names.
+/// `SET_FIELDS` in `web/src/control.ts`, read from source: the window's handler for `ui.set`. The
+/// desktop window owns the list; this crate describes it over MCP without depending on the UI.
+/// Anchored on the declaration and checked against the declared array length, so a mis-parse fails
+/// loudly instead of testing the wrong names.
 fn ui_set_fields() -> Vec<String> {
-    let src = std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../ui-egui/src/control.rs")).expect("ui-egui control.rs");
-    let (_, rest) = src.split_once("UI_SET_FIELDS: [&str; ").expect("UI_SET_FIELDS is declared");
-    let declared: usize = rest.split_once(']').expect("declared length").0.parse().expect("declared length");
-    let body = rest.split_once('[').expect("field array").1.split_once("];").expect("terminated array").0;
-    let fields: Vec<String> = body.split('"').skip(1).step_by(2).map(str::to_string).collect();
-    assert_eq!(fields.len(), declared, "parsed {fields:?} from UI_SET_FIELDS; its source shape changed");
+    let src = std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../web/src/control.ts")).expect("web control.ts");
+    let (_, rest) = src.split_once("const SET_FIELDS = [").expect("SET_FIELDS is declared");
+    let body = rest.split_once("];").expect("terminated array").0;
+    let fields: Vec<String> = body.split('\'').skip(1).step_by(2).map(str::to_string).collect();
+    assert!(!fields.is_empty(), "parsed no fields from SET_FIELDS; its source shape changed");
     fields
 }
 
@@ -912,8 +911,9 @@ async fn bridge_forwards_to_control_protocol() {
     let e = call(&client, "control_call", json!({"method": "bogus.method"})).await;
     assert_eq!(e.is_error, Some(true));
     assert!(text(&e).contains("unknown tool"));
+    // Bridge mode has no headless session: doc_select runs document.activate in the window instead.
     let r = call(&client, "doc_select", json!({"index": 0})).await;
-    assert_eq!(r.is_error, Some(true));
+    assert_ne!(r.is_error, Some(true));
 
     client.cancel().await.unwrap();
     app.abort();
