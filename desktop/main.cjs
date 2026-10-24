@@ -63,7 +63,7 @@ app.whenReady().then(async () => {
     return;
   }
   const server = await serve();
-  const win = new BrowserWindow({ width: 1440, height: 900, backgroundColor: '#222222', title: 'PhotoDesign', autoHideMenuBar: true });
+  const win = new BrowserWindow({ width: 1440, height: 900, backgroundColor: '#222222', title: 'PhotoDesign', autoHideMenuBar: true, icon: path.join(__dirname, process.platform === 'win32' ? 'icon.ico' : 'icon.png') });
   win.setMenuBarVisibility(false);
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);

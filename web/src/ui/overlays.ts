@@ -38,7 +38,7 @@ export function welcome(app: App, openPicker: () => void, openNew: () => void): 
   });
   el.append(
     h('div.welcome-card',
-      h('div.welcome-head', icon(ICONS.logo, 34), h('div', h('h1', 'Photo', h('b', 'Design')), h('p', t('Edit photos, paint and compose — free and open source.')))),
+      h('div.welcome-head', h('img.welcome-logo', { src: './logo-256.png', alt: '', width: 64, height: 64 }), h('div', h('h1', 'Photo', h('b', 'Design')), h('p', t('Edit photos, paint and compose — free and open source.')))),
       h('div.welcome-actions',
         h('button.primary-btn.large', { onclick: openPicker }, icon(ICONS.open, 18), t('Open an image')),
         h('button.ghost-btn.large', { onclick: openNew }, icon(ICONS.plus, 18), t('Custom size…'))),

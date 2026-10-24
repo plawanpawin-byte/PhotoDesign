@@ -28,6 +28,24 @@ export interface SelectSettings {
   feather: number;
 }
 
+/** Settings of the retouching and shape tools, sent with their engine commands. */
+export interface RetouchSettings {
+  /** Blur, Sharpen, Smudge: 1..100. */
+  strength: number;
+  /** Dodge, Burn: 1..100. */
+  exposure: number;
+  range: 'shadows' | 'midtones' | 'highlights';
+  spongeMode: 'desaturate' | 'saturate';
+  /** Spot Healing: how the fill is made. */
+  healType: 'contentAware' | 'createTexture' | 'proximityMatch';
+  /** Clone Stamp and Healing Brush: keep the source moving with each stroke. */
+  aligned: boolean;
+  /** Type tool: size in points. */
+  typeSize: number;
+  /** Shape tools: line weight in pixels. */
+  lineWeight: number;
+}
+
 export type GradientStyle = 'linear' | 'radial' | 'angle' | 'reflected' | 'diamond';
 
 export interface Rect {
@@ -62,6 +80,9 @@ export class App {
   fill: FillSettings = { tolerance: 32, contiguous: true };
   select: SelectSettings = { mode: 'replace', feather: 0 };
   gradientStyle: GradientStyle = 'linear';
+  retouch: RetouchSettings = { strength: 50, exposure: 50, range: 'midtones', spongeMode: 'desaturate', healType: 'contentAware', aligned: true, typeSize: 48, lineWeight: 4 };
+  /** Clone Stamp / Healing Brush source, set by Alt-clicking (document pixels). */
+  cloneSource: { x: number; y: number } | null = null;
   /** The crop being drawn, in document pixels, until it is applied or cancelled. */
   cropRect: Rect | null = null;
   toasts: Toast[] = [];
@@ -173,6 +194,16 @@ export class App {
 
   setSelect(patch: Partial<SelectSettings>) {
     this.select = { ...this.select, ...patch };
+    this.emit('settings');
+  }
+
+  setRetouch(patch: Partial<RetouchSettings>) {
+    this.retouch = { ...this.retouch, ...patch };
+    this.emit('settings');
+  }
+
+  setCloneSource(at: { x: number; y: number } | null) {
+    this.cloneSource = at;
     this.emit('settings');
   }
 

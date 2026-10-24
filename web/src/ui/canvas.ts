@@ -3,7 +3,9 @@
 import type { App, Rect } from '../app';
 import { bytesToHex, toHex } from '../lib/color';
 import { pan, stepZoom, toDoc, toScreen, zoomAt, type Point } from '../lib/viewport';
-import { toolDef, type ToolId } from '../tools/tools';
+import { clickCall, dragCall, strokeCall, type StrokeContext } from '../tools/commands';
+import { STROKE_TOOLS, toolDef, type ToolId } from '../tools/tools';
+import { t } from '../lib/i18n';
 import { h } from './dom';
 
 /** Longest side the engine renders for the screen; larger documents are shown scaled. */
@@ -12,10 +14,18 @@ const RENDER_MAX = 4096;
 const CLICK_SLOP = 3;
 
 interface Stroke {
+  tool: ToolId;
   points: number[][];
   screen: Point[];
   erase: boolean;
 }
+
+/** Tools whose drag builds a shape: a rectangle, a path, a line or a move. */
+const DRAG_TOOLS: readonly ToolId[] = ['marquee', 'ellipse', 'crop', 'gradient', 'lasso', 'magneticLasso', 'objectSelect', 'move', 'patch', 'rectShape', 'ellipseShape', 'lineShape'];
+/** Drags that may leave the document (the rest are clamped to it). */
+const UNCLAMPED: readonly ToolId[] = ['gradient', 'lasso', 'magneticLasso', 'move', 'patch', 'lineShape'];
+/** Strokes drawn in the foreground colour while they're being made; the rest show their path. */
+const COLOURED: readonly ToolId[] = ['brush', 'pencil', 'mixer', 'colorReplace'];
 
 /** A drag that builds a shape: a rectangle, a lasso path or a gradient line. */
 interface Drag {
@@ -50,6 +60,17 @@ export function canvasView(app: App): HTMLElement {
   let checker: CanvasPattern | null = null;
   let ants = 0;
   let antsTimer = 0;
+  /** Clone Stamp / Healing Brush: the source's distance from the stroke once the first aligned stroke is made. */
+  let cloneOffset: Point | null = null;
+  let cloneFor: unknown = null;
+  const context = (): StrokeContext => {
+    if (cloneFor !== app.cloneSource) {
+      cloneFor = app.cloneSource;
+      cloneOffset = null;
+    }
+    return { brush: app.brush, retouch: app.retouch, select: app.select, foreground: app.foreground, zoom: app.view.zoom, hasSelection: !!app.doc?.hasSelection, source: cloneOffset && app.retouch.aligned ? { offset: cloneOffset } : app.cloneSource ? { at: app.cloneSource } : {} };
+  };
+  const runCall = (call: ReturnType<typeof strokeCall>) => (call ? app.run(call[0], call[1]) : undefined);
 
   const schedule = () => {
     if (queued) return;
@@ -155,7 +176,7 @@ export function canvasView(app: App): HTMLElement {
     if (stroke && stroke.screen.length) drawStrokePreview(ctx, stroke, app);
     if (drag) drawDrag(ctx, drag, app);
     const tool = app.tools.active;
-    if (pointer && (tool === 'brush' || tool === 'eraser') && !panning) {
+    if (pointer && STROKE_TOOLS.includes(tool) && !panning) {
       const r = Math.max(1, (app.brush.size * v.zoom) / 2);
       ctx.lineWidth = 1;
       ctx.strokeStyle = 'rgba(0,0,0,0.7)';
@@ -213,21 +234,30 @@ export function canvasView(app: App): HTMLElement {
     const d = toDoc(app.view, p);
     if (tool === 'zoom') {
       app.setView(zoomAt(app.view, stepZoom(app.view.zoom, e.altKey ? -1 : 1), p));
-    } else if (tool === 'brush' || tool === 'eraser') {
+    } else if ((tool === 'cloneStamp' || tool === 'healing') && e.altKey) {
+      app.setCloneSource({ x: Math.round(d.x), y: Math.round(d.y) });
+      app.notify(t('Source set'));
+    } else if ((tool === 'cloneStamp' || tool === 'healing') && !app.cloneSource) {
+      app.notify(t('Alt-click to set a source first'), 'error');
+    } else if (STROKE_TOOLS.includes(tool)) {
       capture(e);
-      stroke = { points: [], screen: [], erase: tool === 'eraser' };
+      stroke = { tool, points: [], screen: [], erase: tool === 'eraser' || tool === 'backgroundEraser' };
       addPoint(stroke, d, p, e);
-    } else if (tool === 'fill') {
-      app.run('paint.bucket', { x: Math.floor(d.x), y: Math.floor(d.y), tolerance: app.fill.tolerance, contiguous: app.fill.contiguous });
     } else if (tool === 'eyedropper') {
       pick(app, d);
-    } else if (tool === 'wand') {
-      app.run('select.magicWand', { x: Math.floor(d.x), y: Math.floor(d.y), tolerance: app.fill.tolerance, contiguous: app.fill.contiguous, mode: app.select.mode });
-    } else if (tool === 'marquee' || tool === 'ellipse' || tool === 'crop' || tool === 'gradient' || tool === 'lasso') {
+    } else if (tool === 'type') {
+      // Keep the click from taking focus back from the text field it opens.
+      e.preventDefault();
+      typeAt(app, stage, d, p);
+    } else if (tool === 'patch' && !app.doc.hasSelection) {
+      app.notify(t('Select the area to patch first'), 'error');
+    } else if (DRAG_TOOLS.includes(tool)) {
       capture(e);
-      const c = tool === 'gradient' || tool === 'lasso' ? d : clampToDoc(d);
+      const c = UNCLAMPED.includes(tool) ? d : clampToDoc(d);
       drag = { tool, startScreen: p, start: c, end: c, path: [c] };
       if (tool === 'crop') app.setCrop(null);
+    } else {
+      runCall(clickCall(tool, d, { ...context(), tolerance: app.fill.tolerance, contiguous: app.fill.contiguous }));
     }
     schedule();
   });
@@ -248,8 +278,8 @@ export function canvasView(app: App): HTMLElement {
       }
     } else if (drag) {
       const d = toDoc(app.view, p);
-      drag.end = drag.tool === 'gradient' || drag.tool === 'lasso' ? d : clampToDoc(d);
-      if (drag.tool === 'lasso') drag.path.push(drag.end);
+      drag.end = UNCLAMPED.includes(drag.tool) ? d : clampToDoc(d);
+      if (drag.tool === 'lasso' || drag.tool === 'magneticLasso') drag.path.push(drag.end);
     } else if (app.tools.active === 'eyedropper' && e.buttons === 1) {
       pick(app, toDoc(app.view, p));
     }
@@ -279,6 +309,7 @@ export function canvasView(app: App): HTMLElement {
         if (moved) app.run('paint.gradient', { from: [dr.start.x, dr.start.y], to: [dr.end.x, dr.end.y], style: app.gradientStyle, colors: [app.foreground, app.background] });
         break;
       default:
+        runCall(dragCall(dr.tool, dr.start, dr.end, dr.path, moved, context()));
         break;
     }
   };
@@ -293,15 +324,13 @@ export function canvasView(app: App): HTMLElement {
       const s = stroke;
       stroke = null;
       if (s.points.length === 1) s.points.push([...s.points[0]!]);
-      app.run('paint.stroke', {
-        points: s.points,
-        size: app.brush.size,
-        hardness: app.brush.hardness,
-        opacity: app.brush.opacity,
-        flow: app.brush.flow,
-        zoom: app.view.zoom,
-        ...(s.erase ? { erase: true } : { color: app.foreground }),
-      });
+      const ctxNow = context();
+      const result = runCall(strokeCall(s.tool, s.points, ctxNow)) as { offset?: number[] } | undefined;
+      // An aligned clone keeps its distance from the stroke: the next stroke samples as far away.
+      if ((s.tool === 'cloneStamp' || s.tool === 'healing') && app.cloneSource && !cloneOffset) {
+        const off = Array.isArray(result?.offset) ? result!.offset : [app.cloneSource.x - s.points[0]![0]!, app.cloneSource.y - s.points[0]![1]!];
+        cloneOffset = { x: Number(off[0]) || 0, y: Number(off[1]) || 0 };
+      }
     }
     schedule();
   };
@@ -421,6 +450,41 @@ function drawCrop(ctx: CanvasRenderingContext2D, app: App, r: Rect) {
 
 function drawDrag(ctx: CanvasRenderingContext2D, d: Drag, app: App) {
   const v = app.view;
+  if (d.tool === 'objectSelect' || d.tool === 'rectShape' || d.tool === 'ellipseShape') {
+    const r = rectBetween(d.start, d.end);
+    const a = toScreen(v, { x: r.x, y: r.y });
+    ctx.save();
+    ctx.strokeStyle = d.tool === 'objectSelect' ? '#4a86e8' : '#fff';
+    ctx.fillStyle = d.tool === 'objectSelect' ? 'rgba(74,134,232,0.12)' : app.foreground;
+    ctx.globalAlpha = d.tool === 'objectSelect' ? 1 : 0.6;
+    ctx.beginPath();
+    if (d.tool === 'ellipseShape') ctx.ellipse(a.x + (r.width * v.zoom) / 2, a.y + (r.height * v.zoom) / 2, (r.width * v.zoom) / 2, (r.height * v.zoom) / 2, 0, 0, Math.PI * 2);
+    else ctx.rect(a.x, a.y, r.width * v.zoom, r.height * v.zoom);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+  if (d.tool === 'move' || d.tool === 'patch' || d.tool === 'lineShape') {
+    const a = toScreen(v, d.start);
+    const b = toScreen(v, d.end);
+    ctx.save();
+    ctx.lineWidth = d.tool === 'lineShape' ? Math.max(1, app.retouch.lineWeight * v.zoom) : 1.5;
+    ctx.strokeStyle = d.tool === 'lineShape' ? app.foreground : '#fff';
+    if (d.tool !== 'lineShape') ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    if (d.tool !== 'lineShape' && app.doc?.selectionBounds && d.tool === 'patch') {
+      const [sx, sy, sw, sh] = app.doc.selectionBounds;
+      const o = toScreen(v, { x: sx + d.end.x - d.start.x, y: sy + d.end.y - d.start.y });
+      ctx.strokeRect(o.x, o.y, sw * v.zoom, sh * v.zoom);
+    }
+    ctx.restore();
+    return;
+  }
   if (d.tool === 'marquee' || d.tool === 'ellipse' || d.tool === 'crop') {
     const r = rectBetween(d.start, d.end);
     const a = toScreen(v, { x: r.x, y: r.y });
@@ -436,7 +500,7 @@ function drawDrag(ctx: CanvasRenderingContext2D, d: Drag, app: App) {
       ctx.restore();
     } else if (d.tool === 'crop') drawCrop(ctx, app, r);
     else outline(ctx, a.x, a.y, r.width * v.zoom, r.height * v.zoom, 0);
-  } else if (d.tool === 'lasso') {
+  } else if (d.tool === 'lasso' || d.tool === 'magneticLasso') {
     ctx.save();
     ctx.setLineDash([5, 4]);
     ctx.strokeStyle = '#fff';
@@ -504,8 +568,9 @@ function drawStrokePreview(ctx: CanvasRenderingContext2D, stroke: Stroke, app: A
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.lineWidth = width;
-  ctx.globalAlpha = stroke.erase ? 0.55 : Math.max(0.15, app.brush.opacity);
-  ctx.strokeStyle = stroke.erase ? '#d9d9d9' : app.foreground;
+  const coloured = COLOURED.includes(stroke.tool);
+  ctx.globalAlpha = coloured ? Math.max(0.15, app.brush.opacity) : 0.35;
+  ctx.strokeStyle = coloured ? app.foreground : stroke.erase ? '#d9d9d9' : '#9cc3ff';
   if (stroke.erase) ctx.setLineDash([Math.max(2, width / 3), Math.max(2, width / 3)]);
   ctx.beginPath();
   stroke.screen.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
@@ -515,6 +580,29 @@ function drawStrokePreview(ctx: CanvasRenderingContext2D, stroke: Stroke, app: A
   }
   ctx.stroke();
   ctx.restore();
+}
+
+/** The Type tool: a text field at the click; Enter makes a type layer, Escape or leaving it cancels. */
+function typeAt(app: App, stage: HTMLElement, at: Point, screen: Point) {
+  stage.querySelector('.type-entry')?.remove();
+  const input = h('input.type-entry', { type: 'text', placeholder: t('Type, then Enter'), 'aria-label': t('Type') }) as HTMLInputElement;
+  Object.assign(input.style, { left: `${screen.x}px`, top: `${screen.y - 14}px`, color: app.foreground, fontSize: `${Math.max(11, Math.min(64, app.retouch.typeSize * app.view.zoom))}px` });
+  let done = false;
+  const close = (commit: boolean) => {
+    if (done) return;
+    done = true;
+    const text = input.value;
+    input.remove();
+    if (commit && text.trim()) app.run('type.create', { x: Math.round(at.x), y: Math.round(at.y), text, size: app.retouch.typeSize, color: app.foreground });
+  };
+  input.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') close(true);
+    else if (e.key === 'Escape') close(false);
+  });
+  input.addEventListener('blur', () => close(true));
+  stage.append(input);
+  setTimeout(() => input.focus(), 0);
 }
 
 function makeChecker(ctx: CanvasRenderingContext2D): CanvasPattern | null {

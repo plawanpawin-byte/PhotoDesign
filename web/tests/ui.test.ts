@@ -41,7 +41,8 @@ describe('interface', () => {
     expect(root.querySelector('.opt-held')?.textContent).toBe('held');
     key('keyup', ' ');
     expect(active()).toEqual(['brush']);
-    key('keydown', 'f');
+    key('keydown', 'g');
+    key('keydown', 'G', { shiftKey: true });
     expect(app.tools.selected).toBe('fill');
     expect(active()).toEqual(['fill']);
     expect(root.querySelector('.tool-options')?.textContent).toContain('Tolerance');
@@ -157,19 +158,19 @@ describe('interface', () => {
     });
 
     it('the ellipse tool and a drag outside the document stay within it', () => {
-      const { root, engine } = doc();
-      key('keydown', 'o');
+      const { root, engine, app } = doc();
+      app.tools.select('ellipse');
       drag(root, [150, 50], [400, 300]);
       expect(engine.calls.at(-1)).toEqual(['select.rect', { x: 150, y: 50, width: 50, height: 50, ellipse: true, mode: 'replace', feather: 0 }]);
     });
 
     it('the magic wand and the gradient run their commands', () => {
       const { root, engine, app } = doc();
-      key('keydown', 'w');
+      app.tools.select('wand');
       drag(root, [30, 30], [30, 30]);
       expect(engine.calls.at(-1)?.[0]).toBe('select.magicWand');
       expect(engine.calls.at(-1)?.[1]).toMatchObject({ x: 30, y: 30, tolerance: 32 });
-      key('keydown', 'g');
+      app.tools.select('gradient');
       app.setGradientStyle('radial');
       drag(root, [0, 0], [100, 0]);
       expect(engine.calls.at(-1)).toEqual(['paint.gradient', { from: [0, 0], to: [100, 0], style: 'radial', colors: ['#000000', '#ffffff'] }]);
@@ -195,6 +196,51 @@ describe('interface', () => {
       expect(tile('Deselect').disabled).toBe(true);
       expect(tile('Select all').disabled).toBe(false);
     });
+  });
+
+  it('every tool slot shows one tool and right-click opens the others in it', () => {
+    const { root, app } = setup();
+    const slots = root.querySelectorAll<HTMLButtonElement>('.tool-dock .tool');
+    expect(slots.length).toBeLessThan(25);
+    const dodge = root.querySelector<HTMLButtonElement>('.tool[data-tool="dodge"]')!;
+    dodge.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }));
+    const items = [...document.querySelectorAll<HTMLButtonElement>('.tool-fly-item')].map((b) => b.dataset.tool);
+    expect(items).toEqual(['dodge', 'burn', 'sponge']);
+    document.querySelector<HTMLButtonElement>('.tool-fly-item[data-tool="burn"]')!.click();
+    expect(app.tools.selected).toBe('burn');
+    expect(root.querySelector('.tool[data-tool="burn"]')?.classList.contains('active')).toBe(true);
+    expect(root.querySelector('.tool[data-tool="dodge"]')).toBeNull();
+    expect(root.querySelector('.tool-options')?.textContent).toContain('Exposure');
+  });
+
+  it('retouching, shape and clone tools send the engine commands', () => {
+    const { root, engine, app } = setup();
+    app.newDocument({ width: 200, height: 100 });
+    app.setView({ zoom: 1, x: 0, y: 0 });
+    const canvas = root.querySelector<HTMLCanvasElement>('.stage-canvas')!;
+    const fire = (type: string, x: number, y: number, buttons: number, extra: MouseEventInit = {}) => canvas.dispatchEvent(new MouseEvent(type, { clientX: x, clientY: y, button: 0, buttons, bubbles: true, ...extra }));
+    const drag = (a: [number, number], b: [number, number]) => { fire('pointerdown', a[0], a[1], 1); fire('pointermove', b[0], b[1], 1); fire('pointerup', b[0], b[1], 0); };
+    app.tools.select('smudge');
+    drag([10, 10], [40, 20]);
+    expect(engine.calls.at(-1)?.[0]).toBe('paint.smudge');
+    expect(engine.calls.at(-1)?.[1]).toMatchObject({ strength: 50, size: 24 });
+    app.tools.select('rectShape');
+    drag([10, 10], [60, 50]);
+    expect(engine.calls.at(-1)).toEqual(['shape.create', { kind: 'rect', rect: [10, 10, 50, 40], fill: '#000000' }]);
+    app.tools.select('move');
+    drag([10, 10], [25, 5]);
+    expect(engine.calls.at(-1)).toEqual(['layer.translate', { dx: 15, dy: -5 }]);
+    app.tools.select('cloneStamp');
+    const before = engine.calls.length;
+    drag([50, 50], [60, 50]);
+    expect(engine.calls.length).toBe(before);
+    fire('pointerdown', 5, 5, 1, { altKey: true });
+    fire('pointerup', 5, 5, 0);
+    drag([50, 50], [60, 50]);
+    expect(engine.calls.at(-1)?.[0]).toBe('paint.cloneStamp');
+    expect(engine.calls.at(-1)?.[1]).toMatchObject({ source: [5, 5], aligned: true });
+    drag([80, 50], [90, 50]);
+    expect(engine.calls.at(-1)?.[1]).toMatchObject({ offset: [-45, -45] });
   });
 
   it('switching to Thai rebuilds the interface and keeps the document', () => {

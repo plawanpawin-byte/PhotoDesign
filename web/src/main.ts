@@ -89,7 +89,7 @@ export function mount(root: HTMLElement, app: App): () => void {
       }
     }
     if (!e.ctrlKey && !e.metaKey && !e.altKey) {
-      const tool = toolByKey(e.key);
+      const tool = toolByKey(e.key, e.shiftKey, app.tools.selected);
       if (tool) {
         e.preventDefault();
         app.tools.select(tool.id);

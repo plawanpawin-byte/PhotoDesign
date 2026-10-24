@@ -286,3 +286,21 @@ input[type='checkbox'] { accent-color: var(--brand); }
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: #4a4a4a; border-radius: 4px; border: 2px solid transparent; background-clip: padding-box; }
 ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+
+/* tool slots with more tools behind them, and their flyout */
+.tool { position: relative; }
+.tool-more { position: absolute; right: 2px; bottom: 2px; width: 0; height: 0; border-left: 4px solid transparent; border-bottom: 4px solid var(--text-faint); }
+.tool-fly { position: fixed; z-index: 70; min-width: 210px; padding: 3px 0; background: var(--card-2); border: 1px solid var(--line); box-shadow: var(--shadow); }
+.tool-fly-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 4px 10px; color: var(--text); text-align: left; }
+.tool-fly-item span { flex: 1; }
+.tool-fly-item kbd { border: 0; }
+.tool-fly-item:hover { background: var(--sel); }
+.tool-fly-item.active { box-shadow: inset 2px 0 0 var(--brand); background: #3a3a3a; }
+
+/* Type tool: the text being typed, where it will go */
+.type-entry { position: absolute; z-index: 5; min-width: 160px; padding: 0 2px; background: rgba(0, 0, 0, 0.25); border: 1px dashed #9cc3ff; outline: none; font-family: var(--font); }
+
+/* the app logo */
+.brand-logo { display: block; width: 18px; height: 18px; border-radius: 4px; }
+.welcome-logo { display: block; width: 64px; height: 64px; border-radius: 14px; }
+.boot-logo { border-radius: 20px; }

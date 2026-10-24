@@ -4,7 +4,7 @@ import type { GradientStyle, SelectMode } from '../app';
 import { LANGUAGES, getLang, setLang, t } from '../lib/i18n';
 import { nextBrushSize } from '../lib/keys';
 import { centre, formatZoom, stepZoom, zoomAt } from '../lib/viewport';
-import { TOOLS, toolDef } from '../tools/tools';
+import { GROUPS, STROKE_TOOLS, groupCurrent, toolDef, type ToolId } from '../tools/tools';
 import { buildMenuTree } from '../lib/menu-tree';
 import { CLIENT_MENUS } from './overlays';
 import { clear, h, icon } from './dom';
@@ -43,7 +43,7 @@ export function menuBar(app: App, actions: ChromeActions): HTMLElement {
   app.on('state', render);
   render();
   return h('header.menubar',
-    h('div.brand', { title: 'PhotoDesign' }, icon(ICONS.logo, 16)),
+    h('div.brand', { title: 'PhotoDesign' }, h('img.brand-logo', { src: './logo-64.png', alt: 'PhotoDesign', width: 18, height: 18 })),
     h('nav.menubar-items', { role: 'menubar' }, items),
     h('div.topbar-spacer'),
     search,
@@ -82,9 +82,52 @@ export function languageButton(): HTMLElement {
 
 /** The tool strip, docked to the left edge from the options bar down to the status bar. */
 export function toolDock(app: App): HTMLElement {
-  const buttons = TOOLS.map((tool) =>
-    h('button.tool', { title: `${t(tool.label)} (${tool.key}) — ${t(tool.hint)}`, 'aria-label': t(tool.label), dataset: { tool: tool.id }, onclick: () => app.tools.select(tool.id) },
-      icon(ICONS[tool.id as IconName], 17)));
+  let fly: HTMLElement | null = null;
+  const closeFly = () => {
+    fly?.remove();
+    fly = null;
+  };
+  document.addEventListener('pointerdown', (e) => {
+    if (fly && !fly.contains(e.target as Node)) closeFly();
+  });
+  const openFly = (slot: HTMLElement, group: readonly ToolId[]) => {
+    closeFly();
+    const r = slot.getBoundingClientRect();
+    fly = h('div.tool-fly', { role: 'menu', style: { left: `${r.right + 2}px`, top: `${r.top}px` } },
+      group.map((id) => {
+        const def = toolDef(id);
+        return h('button.tool-fly-item', { role: 'menuitem', dataset: { tool: id }, class: id === app.tools.active ? 'active' : '', onclick: () => { closeFly(); app.tools.select(id); } },
+          icon(ICONS[id as IconName], 16), h('span', t(def.label)), h('kbd', def.key));
+      }));
+    document.body.append(fly);
+  };
+  const buttons = GROUPS.map((group) => {
+    const b = h('button.tool', { 'aria-haspopup': group.length > 1 ? 'menu' : null }) as HTMLButtonElement;
+    let holdTimer = 0;
+    b.addEventListener('click', () => app.tools.select(b.dataset.tool as ToolId));
+    b.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      if (group.length > 1) openFly(b, group);
+    });
+    b.addEventListener('pointerdown', () => {
+      window.clearTimeout(holdTimer);
+      if (group.length > 1) holdTimer = window.setTimeout(() => openFly(b, group), 450);
+    });
+    for (const ev of ['pointerup', 'pointerleave']) b.addEventListener(ev, () => window.clearTimeout(holdTimer));
+    return { b, group };
+  });
+  const paintSlots = () => {
+    for (const { b, group } of buttons) {
+      const id = group.includes(app.tools.active) ? app.tools.active : groupCurrent(group);
+      const def = toolDef(id);
+      if (b.dataset.tool !== id) {
+        b.dataset.tool = id;
+        b.replaceChildren(icon(ICONS[id as IconName], 17), ...(group.length > 1 ? [h('span.tool-more')] : []));
+      }
+      b.title = `${t(def.label)} (${def.key}) — ${t(def.hint)}${group.length > 1 ? ` · ${t('right-click for more')}` : ''}`;
+      b.setAttribute('aria-label', t(def.label));
+    }
+  };
   const fg = h('input.chip-input', { type: 'color', title: t('Foreground colour'), 'aria-label': t('Foreground colour') }) as HTMLInputElement;
   const bg = h('input.chip-input', { type: 'color', title: t('Background colour'), 'aria-label': t('Background colour') }) as HTMLInputElement;
   fg.addEventListener('change', () => app.setForeground(fg.value));
@@ -92,7 +135,8 @@ export function toolDock(app: App): HTMLElement {
   const fgChip = h('label.chip.fg', fg);
   const bgChip = h('label.chip.bg', bg);
   const render = () => {
-    for (const b of buttons) {
+    paintSlots();
+    for (const { b } of buttons) {
       const id = b.dataset.tool;
       b.classList.toggle('active', id === app.tools.active);
       b.classList.toggle('held', id === app.tools.active && app.tools.isTemporary);
@@ -106,7 +150,7 @@ export function toolDock(app: App): HTMLElement {
   app.on('state', render);
   render();
   return h('nav.tool-dock', { 'aria-label': 'Tools' },
-    h('div.tool-list', buttons),
+    h('div.tool-list', buttons.map((x) => x.b)),
     h('div.dock-sep'),
     h('div.chip-actions',
       h('button.mini-btn.reset', { title: t('Black and white (D)'), onclick: () => app.defaultColors() }, h('i'), h('i')),
@@ -143,26 +187,58 @@ export function toolOptions(app: App): HTMLElement {
     const tool = app.tools.active;
     const def = toolDef(tool);
     el.append(h('span.opt-tool', icon(ICONS[tool as IconName], 15), t(def.label), app.tools.isTemporary ? h('span.opt-held', t('held')) : null));
+    const sizeRow = () => slider('Size', 1, 500, 1, app.brush.size, (v) => `${v}px`, (v) => app.setBrush({ size: v }));
+    const hardRow = () => slider('Hardness', 0, 1, 0.01, app.brush.hardness, pct, (v) => app.setBrush({ hardness: v }));
+    const opRow = () => slider('Opacity', 0.01, 1, 0.01, app.brush.opacity, pct, (v) => app.setBrush({ opacity: v }));
+    const flowRow = () => slider('Flow', 0.01, 1, 0.01, app.brush.flow, pct, (v) => app.setBrush({ flow: v }));
+    const r = app.retouch;
     if (tool === 'brush' || tool === 'eraser') {
-      el.append(
-        slider('Size', 1, 500, 1, app.brush.size, (v) => `${v}px`, (v) => app.setBrush({ size: v })),
-        slider('Hardness', 0, 1, 0.01, app.brush.hardness, pct, (v) => app.setBrush({ hardness: v })),
-        slider('Opacity', 0.01, 1, 0.01, app.brush.opacity, pct, (v) => app.setBrush({ opacity: v })),
-        slider('Flow', 0.01, 1, 0.01, app.brush.flow, pct, (v) => app.setBrush({ flow: v })),
-      );
-    } else if (tool === 'fill' || tool === 'wand') {
+      el.append(sizeRow(), hardRow(), opRow(), flowRow());
+    } else if (tool === 'pencil') {
+      el.append(sizeRow(), opRow());
+    } else if (tool === 'mixer' || tool === 'colorReplace') {
+      el.append(sizeRow());
+    } else if (tool === 'backgroundEraser') {
+      el.append(sizeRow(), hardRow());
+    } else if (tool === 'cloneStamp' || tool === 'healing') {
+      const aligned = h('input', { type: 'checkbox', checked: r.aligned }) as HTMLInputElement;
+      aligned.addEventListener('change', () => app.setRetouch({ aligned: aligned.checked }));
+      el.append(sizeRow(), hardRow(), opRow(), h('label.opt-check', aligned, t('Aligned')),
+        h('span.opt-hint', app.cloneSource ? `${t('Source')} ${app.cloneSource.x}, ${app.cloneSource.y}` : t('Alt-click to set a source first')));
+    } else if (tool === 'spotHealing') {
+      el.append(sizeRow(), select('Type', [['contentAware', 'Content-Aware'], ['createTexture', 'Create Texture'], ['proximityMatch', 'Proximity Match']] as const, r.healType, (v) => app.setRetouch({ healType: v })));
+    } else if (tool === 'patternStamp' || tool === 'historyBrush') {
+      el.append(sizeRow(), hardRow(), opRow());
+    } else if (tool === 'blur' || tool === 'sharpen' || tool === 'smudge') {
+      el.append(sizeRow(), hardRow(), slider('Strength', 1, 100, 1, r.strength, (v) => `${v}%`, (v) => app.setRetouch({ strength: v })));
+    } else if (tool === 'dodge' || tool === 'burn') {
+      el.append(sizeRow(), select('Range', [['shadows', 'Shadows'], ['midtones', 'Midtones'], ['highlights', 'Highlights']] as const, r.range, (v) => app.setRetouch({ range: v })),
+        slider('Exposure', 1, 100, 1, r.exposure, (v) => `${v}%`, (v) => app.setRetouch({ exposure: v })));
+    } else if (tool === 'sponge') {
+      el.append(sizeRow(), select('Mode', [['desaturate', 'Desaturate'], ['saturate', 'Saturate']] as const, r.spongeMode, (v) => app.setRetouch({ spongeMode: v })), flowRow());
+    } else if (tool === 'quickSelect') {
+      el.append(select('Mode', MODES, app.select.mode, (v) => app.setSelect({ mode: v })), sizeRow());
+    } else if (tool === 'fill' || tool === 'wand' || tool === 'magicEraser') {
       const contiguous = h('input', { type: 'checkbox', checked: app.fill.contiguous }) as HTMLInputElement;
       contiguous.addEventListener('change', () => app.setFill({ contiguous: contiguous.checked }));
       if (tool === 'wand') el.append(select('Mode', MODES, app.select.mode, (v) => app.setSelect({ mode: v })));
       el.append(slider('Tolerance', 0, 255, 1, app.fill.tolerance, (v) => String(v), (v) => app.setFill({ tolerance: v })), h('label.opt-check', contiguous, t('Connected only')));
-    } else if (tool === 'marquee' || tool === 'ellipse' || tool === 'lasso') {
+    } else if (tool === 'marquee' || tool === 'ellipse' || tool === 'lasso' || tool === 'magneticLasso') {
       el.append(select('Mode', MODES, app.select.mode, (v) => app.setSelect({ mode: v })), slider('Feather', 0, 100, 1, app.select.feather, (v) => `${v}px`, (v) => app.setSelect({ feather: v })));
+    } else if (tool === 'objectSelect') {
+      el.append(select('Mode', MODES, app.select.mode, (v) => app.setSelect({ mode: v })), h('button.bar-btn.ghost-btn', { onclick: () => app.run('select.subject', { mode: app.select.mode }) }, t('Select Subject')));
+    } else if (tool === 'type') {
+      el.append(slider('Size', 4, 400, 1, r.typeSize, (v) => `${v}pt`, (v) => app.setRetouch({ typeSize: v })), h('span.opt-hint', `${t('Colour')} ${app.foreground}`));
+    } else if (tool === 'lineShape') {
+      el.append(slider('Weight', 1, 100, 1, r.lineWeight, (v) => `${v}px`, (v) => app.setRetouch({ lineWeight: v })), h('span.opt-hint', `${t('Fill')} ${app.foreground}`));
+    } else if (tool === 'rectShape' || tool === 'ellipseShape') {
+      el.append(h('span.opt-hint', `${t('Fill')} ${app.foreground} · ${t(def.hint)}`));
     } else if (tool === 'gradient') {
       el.append(select('Style', STYLES, app.gradientStyle, (v) => app.setGradientStyle(v)), h('span.opt-hint', `${app.foreground} → ${app.background}`));
     } else if (tool === 'crop') {
-      const r = app.cropRect;
-      el.append(h('span.opt-hint', r ? `${Math.round(r.width)} × ${Math.round(r.height)} px` : t(def.hint)));
-      if (r) el.append(h('button.primary-btn.small', { onclick: () => app.applyCrop() }, t('Apply crop')), h('button.ghost-btn', { onclick: () => app.setCrop(null) }, t('Cancel')));
+      const cr = app.cropRect;
+      el.append(h('span.opt-hint', cr ? `${Math.round(cr.width)} × ${Math.round(cr.height)} px` : t(def.hint)));
+      if (cr) el.append(h('button.primary-btn.small', { onclick: () => app.applyCrop() }, t('Apply crop')), h('button.ghost-btn', { onclick: () => app.setCrop(null) }, t('Cancel')));
     } else {
       el.append(h('span.opt-hint', t(def.hint)));
     }
@@ -170,8 +246,8 @@ export function toolOptions(app: App): HTMLElement {
   app.on('tool', render);
   app.on('crop', render);
   app.on('settings', () => {
-    const tool = app.tools.active;
-    if (tool === 'brush' || tool === 'eraser' || tool === 'gradient') render();
+    // Rebuild only when a value shown as text changed; a slider being dragged keeps its element.
+    if (!el.contains(document.activeElement) || document.activeElement?.tagName !== 'INPUT') render();
   });
   render();
   return el;
@@ -221,7 +297,7 @@ export function statusLine(app: App): HTMLElement {
       h('span', `${d.mode.toUpperCase()} · ${d.depth}-bit`),
       h('span', `${Math.round(d.resolution)} ppi`),
       ...(d.selectionBounds ? [h('span', `${t('Selection')} ${d.selectionBounds[2]} × ${d.selectionBounds[3]}`)] : []),
-      h('span.status-tool', `${t(toolDef(tool).label)}${tool === 'brush' || tool === 'eraser' ? ` · ${app.brush.size}px` : ''}`),
+      h('span.status-tool', `${t(toolDef(tool).label)}${STROKE_TOOLS.includes(tool) ? ` · ${app.brush.size}px` : ''}`),
     );
   };
   app.on('state', render);

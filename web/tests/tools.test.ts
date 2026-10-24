@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ToolHand, TOOLS, toolByKey } from '../src/tools/tools';
+import { GROUPS, ToolHand, TOOLS, groupCurrent, groupOf, toolByKey, toolDef } from '../src/tools/tools';
 
 describe('one tool in hand', () => {
   it('Space puts the brush down and picks up Pan, release gives the brush back', () => {
@@ -71,10 +71,17 @@ describe('one tool in hand', () => {
     expect(fn).toHaveBeenCalledTimes(3);
   });
 
-  it('every tool has a unique key', () => {
-    const keys = TOOLS.map((x) => x.key);
-    expect(new Set(keys).size).toBe(keys.length);
+  it('tools sharing a key share a slot; Shift+key cycles through it', () => {
+    const slotKeys = GROUPS.map((g) => toolDef(g[0]!).key);
+    expect(new Set(slotKeys).size).toBe(slotKeys.length);
+    expect(GROUPS.flat()).toHaveLength(TOOLS.length);
     expect(toolByKey('b')?.id).toBe('brush');
+    expect(toolByKey('b', true, 'brush')?.id).toBe('pencil');
+    expect(toolByKey('o', true, 'sponge')?.id).toBe('dodge');
     expect(toolByKey('q')).toBeUndefined();
+    const t = new ToolHand('brush');
+    t.select('burn');
+    expect(groupCurrent(groupOf('dodge'))).toBe('burn');
+    expect(toolByKey('o')?.id).toBe('burn');
   });
 });
