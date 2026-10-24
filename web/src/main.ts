@@ -72,7 +72,8 @@ export function mount(root: HTMLElement, app: App): () => void {
     if (action) {
       e.preventDefault();
       switch (action) {
-        case 'undo': return app.undo();
+        // While a path is being drawn, undo takes its last anchor away (as in Photoshop), not the document's last edit.
+        case 'undo': return app.pen ? app.penUndo() : app.undo();
         case 'redo': return app.redo();
         case 'open': return actions.openPicker();
         case 'new': return actions.openNew();

@@ -70,6 +70,17 @@ export function commitCall(path: PenPath, closed: boolean, mode: PenMode, foregr
     : ['shape.create', { kind: 'path', path: engine, fill: null, stroke: { width: 2, color: foreground } }];
 }
 
+/** Screen distance within which a click on the last anchor is the same click again (a double-click) and adds nothing. */
+const SAME_SPOT = 3;
+
+/** Whether a screen point is on the last anchor: the second click of a double-click, which must not add a second anchor there. */
+export function repeatsLast(path: PenPath, screen: Point, toScreen: (p: Point) => Point): boolean {
+  const last = path.knots.at(-1);
+  if (!last) return false;
+  const s = toScreen(last.anchor);
+  return Math.hypot(screen.x - s.x, screen.y - s.y) <= SAME_SPOT;
+}
+
 /** The outline of the path as segments to draw: a straight line or a cubic curve between anchors. */
 export interface PenSegment {
   from: Point;

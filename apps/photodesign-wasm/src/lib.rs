@@ -81,6 +81,19 @@ impl Studio {
         Ok(pack_files(&files))
     }
 
+    /// Adds a font the web build has no room to embed (TTF/OTF bytes the shell fetched), as the
+    /// fallback for `scripts` (ISO 15924, e.g. `Thai`): text in those scripts that the bundled fonts
+    /// lack is set in it from then on. Returns the family names registered. Add fonts before the
+    /// text that needs them is drawn; layers drawn earlier keep what they had until re-rendered.
+    pub fn add_font(bytes: Vec<u8>, scripts: &[String]) -> Result<Vec<String>, String> {
+        let mut engine = photocraft_text::shared().lock().unwrap_or_else(|e| e.into_inner());
+        let names = engine.fonts.register_script_font(bytes, scripts);
+        if names.is_empty() {
+            return Err("add_font: not a font file".into());
+        }
+        Ok(names)
+    }
+
     /// The file the active document may be saved back to when no path is given: its own, and only
     /// when that is a layered format (PSD, PSB, OpenRaster, .pcraft) that holds the whole document,
     /// so a flat copy never replaces the original. The error says why not and what to do.
@@ -202,6 +215,11 @@ pub mod web {
         pub fn export_files(&self, kind: &str, params: &str) -> Result<Vec<u8>, JsError> {
             let params = object_params("exportFiles", params)?;
             self.studio.export_files(kind, &params).map_err(fail)
+        }
+        /// Adds a font fetched by the shell as the fallback for `scripts` (comma-separated ISO 15924).
+        pub fn add_font(&self, bytes: Vec<u8>, scripts: &str) -> Result<String, JsError> {
+            let scripts: Vec<String> = scripts.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+            super::Studio::add_font(bytes, &scripts).map(|names| serde_json::json!(names).to_string()).map_err(fail)
         }
         pub fn write_back_path(&self) -> Result<String, JsError> {
             self.studio.write_back_path().map_err(fail)

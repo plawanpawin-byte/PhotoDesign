@@ -290,6 +290,20 @@ impl FontDb {
         self.register_blob(Blob::new(Arc::new(bytes)), None)
     }
 
+    /// Registers font data as the fallback for `scripts` (ISO 15924, e.g. `Thai`): text in those
+    /// scripts that the bundled fonts lack is set in it. For a host that fetches fonts the build
+    /// has no room to embed (the web shell); the same as listing it in a served font manifest.
+    /// Returns the family names added.
+    pub fn register_script_font(&mut self, bytes: Vec<u8>, scripts: &[String]) -> Vec<String> {
+        let names = self.register_font_data(bytes);
+        let fonts: Vec<crate::served::ServedFont> = names.iter().map(|family| crate::served::ServedFont { family: family.clone(), file: String::new(), scripts: scripts.to_vec(), integrity: None }).collect();
+        crate::served::add_fonts(&fonts);
+        // The fallback stack was built before the script fallbacks were known.
+        self.face_cache.clear();
+        self.refresh_generics();
+        names
+    }
+
     /// Registers embedded font data without copying it.
     fn register_static_font(&mut self, bytes: &'static [u8]) -> Vec<String> {
         self.register_blob(Blob::new(Arc::new(bytes)), None)

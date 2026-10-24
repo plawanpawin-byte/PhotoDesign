@@ -68,13 +68,14 @@ kbd { font: 10.5px var(--mono); color: var(--text-faint); border: 1px solid var(
 /* document tabs: their own row above the image */
 .doc-tabbar { display: flex; align-items: stretch; background: var(--bg); min-width: 0; border-bottom: 1px solid var(--line); }
 .doc-tabs { display: flex; align-items: stretch; min-width: 0; overflow: hidden; }
-.doc-tab { display: inline-flex; align-items: center; gap: 6px; padding: 0 6px 0 10px; color: var(--text-faint); max-width: 300px; border-right: 1px solid var(--line); font-size: 11.5px; }
+.doc-tab { display: inline-flex; align-items: center; gap: 6px; padding: 0 6px 0 10px; color: var(--text-faint); min-width: 120px; max-width: 300px; border-right: 1px solid var(--line); font-size: 11.5px; }
+.doc-tab.add { min-width: 0; }
 .doc-tab:hover { color: var(--text-dim); background: #1d1d1d; }
 .doc-tab.active { background: var(--canvas); color: var(--text); box-shadow: inset 0 2px 0 var(--brand); }
 .doc-tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .doc-tab-meta { color: var(--text-faint); }
 .doc-tab .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--brand-hi); flex: none; }
-.doc-tab-close { display: grid; place-items: center; width: 16px; height: 16px; border-radius: var(--radius-xs); opacity: 0.55; }
+.doc-tab-close { margin-left: auto; display: grid; place-items: center; width: 16px; height: 16px; border-radius: var(--radius-xs); opacity: 0.55; }
 .doc-tab-close:hover { background: var(--hover); opacity: 1; }
 .doc-tab.add { padding: 0; width: 28px; justify-content: center; border-right: 0; }
 

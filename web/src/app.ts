@@ -147,6 +147,11 @@ export class App {
     const key = s.active === null ? null : `${s.active}:${s.documents[s.active]?.name ?? ''}`;
     if (key !== this.fittedRevisionDoc) {
       this.fittedRevisionDoc = key;
+      // A path being drawn belongs to the document it was started in.
+      if (this.pen) {
+        this.pen = null;
+        this.emit('pen');
+      }
       if (this.doc) this.fitView();
     }
     this.syncPathEdit();

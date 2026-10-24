@@ -16,6 +16,7 @@ crate-type = ["cdylib", "rlib"]
 photocraft-engine = { workspace = true }
 photocraft-compose = { workspace = true }
 photocraft-io = { workspace = true }
+photocraft-text = { workspace = true }
 serde_json = { workspace = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

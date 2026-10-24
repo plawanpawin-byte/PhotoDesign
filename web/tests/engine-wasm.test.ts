@@ -2,8 +2,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
-import { EngineClient, EngineError } from '../src/engine/client';
+import { describe, expect, it, vi } from 'vitest';
+import { EngineClient, EngineError, loadScriptFonts } from '../src/engine/client';
 
 const pkgDir = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'engine', 'pkg');
 const built = existsSync(join(pkgDir, 'photodesign_wasm_bg.wasm'));
@@ -56,5 +56,28 @@ describe.skipIf(!built)('wasm engine', () => {
     const bins = e.histogram(white);
     expect(bins).toHaveLength(1024);
     expect(bins[255]).toBe(4);
+  });
+
+  it('sets Thai text in a fetched font instead of empty boxes', async () => {
+    const e = await engine();
+    const thai = 'สวัสดีชาวโลก';
+    const draw = () => {
+      e.execute('file.new', { width: 360, height: 90, background: 'white' });
+      e.execute('type.create', { x: 10, y: 60, text: thai, size: 40, color: '#000000' });
+      return e.render(360).pixels;
+    };
+    const boxes = draw();
+    const font = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'public', 'fonts', 'NotoSansThai-Regular.ttf'));
+    const names = await loadScriptFonts(e, async () => new Uint8Array(font));
+    expect(names).toContain('Noto Sans Thai');
+    const real = draw();
+    expect(Buffer.from(real).equals(Buffer.from(boxes))).toBe(false);
+    // The missing-glyph box is a heavy filled block; real Thai glyphs are thin strokes, so far less ink.
+    const dark = (px: Uint8Array) => px.reduce((n, v, i) => (i % 4 === 0 && v < 128 ? n + 1 : n), 0);
+    expect(dark(real)).toBeLessThan(dark(boxes) * 0.7);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(await loadScriptFonts(e, async () => { throw new Error('offline'); })).toEqual([]);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 });

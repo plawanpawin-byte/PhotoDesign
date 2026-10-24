@@ -5,7 +5,7 @@ import { bytesToHex, toHex } from '../lib/color';
 import { pan, stepZoom, toDoc, toScreen, zoomAt, type Point } from '../lib/viewport';
 import { clickCall, dragCall, strokeCall, type StrokeContext } from '../tools/commands';
 import { convertCall, hasHandle, hitTest, nextIndex, overlayPoints, select as selectKnot, type Hit } from '../tools/pathedit';
-import { hitsFirst, segments } from '../tools/pen';
+import { hitsFirst, repeatsLast, segments } from '../tools/pen';
 import { STROKE_TOOLS, toolDef, type ToolId } from '../tools/tools';
 import { t } from '../lib/i18n';
 import { h } from './dom';
@@ -288,7 +288,7 @@ export function canvasView(app: App): HTMLElement {
       capture(e);
       if (app.pen && hitsFirst(app.pen, p, (q) => toScreen(app.view, q))) {
         app.finishPen(true);
-      } else {
+      } else if (!(app.pen && repeatsLast(app.pen, p, (q) => toScreen(app.view, q)))) {
         app.penAdd(d);
         penDragging = true;
       }

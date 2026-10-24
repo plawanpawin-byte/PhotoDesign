@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { App } from '../src/app';
 import { handleControl } from '../src/control';
 import { mount } from '../src/main';
-import { addKnot, commitCall, dragLastHandle, hitsFirst, removeLastKnot, segments, toEnginePath, type PenPath } from '../src/tools/pen';
+import { addKnot, commitCall, dragLastHandle, hitsFirst, removeLastKnot, repeatsLast, segments, toEnginePath, type PenPath } from '../src/tools/pen';
 import { FakeEngine } from './fake-engine';
 
 const at = (x: number, y: number) => ({ x, y });
@@ -122,6 +122,38 @@ describe('Pen tool on the canvas', () => {
     key('Escape');
     expect(app.pen).toBeNull();
     expect(engine.calls.filter(([id]) => id === 'shape.create')).toHaveLength(1);
+  });
+
+  it('a double-click adds one anchor, not two on the same spot', async () => {
+    const { app } = await setup();
+    await click(app, 40, 40);
+    await click(app, 41, 40);
+    expect(app.pen!.knots).toHaveLength(1);
+    await click(app, 120, 40);
+    expect(app.pen!.knots).toHaveLength(2);
+    expect(repeatsLast(addKnot(null, at(10, 10)), at(12, 11), (p) => p)).toBe(true);
+    expect(repeatsLast(addKnot(null, at(10, 10)), at(20, 10), (p) => p)).toBe(false);
+  });
+
+  it('Ctrl+Z while drawing takes the last anchor away and leaves the document\'s history alone', async () => {
+    const { app, engine } = await setup();
+    await click(app, 20, 20);
+    await click(app, 100, 60);
+    const calls = engine.calls.length;
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
+    expect(app.pen!.knots).toHaveLength(1);
+    expect(engine.calls.length).toBe(calls);
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true }));
+    expect(app.pen).toBeNull();
+  });
+
+  it('a path in progress is dropped when another document becomes the active one', async () => {
+    const { app, engine } = await setup();
+    await click(app, 20, 20);
+    await click(app, 100, 60);
+    await call(app, 'engine.execute', { command: 'file.new', params: { width: 80, height: 80, name: 'B' } });
+    expect(app.pen).toBeNull();
+    expect(engine.calls.filter(([id]) => id === 'shape.create')).toHaveLength(0);
   });
 
   it('Path mode makes the work path, and picking another tool finishes the path in progress', async () => {

@@ -14,6 +14,7 @@ interface RawEngine {
   export_files(kind: string, params: string): Uint8Array;
   import_data_sets(text: string, params: string): string;
   write_back_path(): string;
+  add_font(bytes: Uint8Array, scripts: string): string;
   place(name: string, bytes: Uint8Array, params: string): string;
   state(): string;
   commands(): string;
@@ -92,6 +93,15 @@ export class EngineClient implements EngineApi {
     }
   }
 
+  /** Registers a font as the fallback for `scripts` (ISO 15924, comma-separated); returns the family names added. */
+  addFont(bytes: Uint8Array, scripts: string): string[] {
+    try {
+      return JSON.parse(this.raw.add_font(bytes, scripts)) as string[];
+    } catch (e) {
+      throw new EngineError('addFont', message(e));
+    }
+  }
+
   writeBackPath(): string {
     try {
       return this.raw.write_back_path();
@@ -150,10 +160,34 @@ export class EngineClient implements EngineApi {
   }
 }
 
+/** Fonts the wasm has no room to embed, served next to the page (`web/public/fonts`): the fallback for their script. */
+export const SCRIPT_FONTS = [{ file: 'fonts/NotoSansThai-Regular.ttf', scripts: 'Thai' }];
+
+/** Fetches and registers the script fonts. A font that cannot be fetched is skipped (that script then shows boxes). */
+export async function loadScriptFonts(engine: EngineClient, fetchBytes: (url: string) => Promise<Uint8Array> = fetchFont): Promise<string[]> {
+  const added: string[] = [];
+  for (const font of SCRIPT_FONTS) {
+    try {
+      added.push(...engine.addFont(await fetchBytes(font.file), font.scripts));
+    } catch (e) {
+      console.warn(`font ${font.file} not loaded:`, e);
+    }
+  }
+  return added;
+}
+
+async function fetchFont(url: string): Promise<Uint8Array> {
+  const response = await fetch(new URL(url, document.baseURI));
+  if (!response.ok) throw new Error(`${url}: ${response.status}`);
+  return new Uint8Array(await response.arrayBuffer());
+}
+
 /** Loads the WebAssembly engine (built by `npm run engine`). */
 export async function loadEngine(): Promise<EngineClient> {
   const pkg = await import('./pkg/photodesign_wasm.js');
   await pkg.default();
   useNative(pkg);
-  return new EngineClient(new pkg.Engine(), pkg);
+  const engine = new EngineClient(new pkg.Engine(), pkg);
+  await loadScriptFonts(engine);
+  return engine;
 }
