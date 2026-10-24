@@ -1,11 +1,11 @@
-// Development-only viewer: serves the Trunk web build (dist/web) on 127.0.0.1 and shows it in a
-// window. The app itself stays native Rust (see AGENTS.md); this only hosts its wasm build.
+// PhotoDesign's desktop window: serves the TypeScript interface (web/dist, with the Rust engine
+// as WebAssembly) on 127.0.0.1 and shows it. Nothing is reachable from other computers.
 const { app, BrowserWindow, shell } = require('electron');
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
 
-const dist = path.resolve(process.env.PHOTODESIGN_WEB_DIST || path.join(__dirname, '..', '..', 'dist', 'web'));
+const dist = path.resolve(process.env.PHOTODESIGN_WEB_DIST || path.join(__dirname, '..', 'web', 'dist'));
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -59,7 +59,7 @@ app.whenReady().then(async () => {
     win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(
       `<body style="font:14px system-ui;background:#222;color:#fff;padding:24px">` +
       `<b>No web build found</b><p>Looked in <code>${dist.replace(/</g, '&lt;')}</code>.</p>` +
-      `<p>Build it first: <code>cd apps/photocraft-web &amp;&amp; trunk build --release</code></p></body>`));
+      `<p>Build it first: <code>cd web &amp;&amp; npm install &amp;&amp; npm run engine &amp;&amp; npm run build</code></p></body>`));
     return;
   }
   const server = await serve();

@@ -1,0 +1,22 @@
+{
+  "name": "photodesign-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PhotoDesign's TypeScript interface over the Rust engine (WebAssembly).",
+  "type": "module",
+  "license": "MIT OR Apache-2.0",
+  "scripts": {
+    "engine": "node scripts/build-engine.mjs",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "jsdom": "25.0.1",
+    "typescript": "5.6.3",
+    "vite": "5.4.10",
+    "vitest": "2.1.4"
+  }
+}

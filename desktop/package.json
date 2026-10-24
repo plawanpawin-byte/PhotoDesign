@@ -1,8 +1,8 @@
 {
-  "name": "photodesign-electron-preview",
+  "name": "photodesign-desktop",
   "version": "0.0.0",
   "private": true,
-  "description": "Development-only window that shows the PhotoDesign web build in Electron. Not a shipped target.",
+  "description": "PhotoDesign desktop window (Electron) for the TypeScript interface in web/.",
   "main": "main.cjs",
   "scripts": {
     "start": "electron ."

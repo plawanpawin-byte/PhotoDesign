@@ -72,6 +72,8 @@ pub const TABLE: &[(&str, Class)] = &[
     ("cli", Class::Exempt),
     ("web", Class::Exempt),
     ("web-boot", Class::Exempt),
+    // PhotoDesign's engine bridge for the TypeScript UI in `web/`.
+    ("photodesign-wasm", Class::Exempt),
     ("xtask", Class::Exempt),
 ];
 

@@ -14,3 +14,11 @@ slow pen-pressure canvas with imported .ABR brushes, high CPU in 0.8.2, live fon
 Pro themes, layer-name memory, VectorCraft files rasterised on import, no colour-space management,
 no .exr export, unstable Remove / Content-Aware / Generative Fill. None of these could be reproduced
 or profiled in a headless build, so they are open.
+
+## Original interface in TypeScript
+
+- `web/`: a new interface in TypeScript (Vite, no UI framework). Own layout, icons and styling in
+  the Lunatic Design dark palette; 44 tests, including ones that drive the real Rust engine.
+- `apps/photodesign-wasm/`: the engine bridge (`Studio`, 6 native tests), compiled to WebAssembly.
+- `desktop/`: Electron window for the interface.
+- The default theme of the egui app now uses the Lunatic palette.
