@@ -40,6 +40,17 @@ function inside(root, rel, method) {
   return full;
 }
 
+/** The bytes of `file`, or an error that names the file instead of a bare ENOENT. */
+function readFile(file, method, encoding) {
+  try {
+    return fs.readFileSync(file, encoding);
+  } catch (e) {
+    if (e && e.code === 'ENOENT') throw new Error(`${method}: \`${path.basename(file)}\` was not found (looked in ${path.dirname(file)})`);
+    if (e && e.code === 'EISDIR') throw new Error(`${method}: \`${path.basename(file)}\` is a folder, not a file`);
+    throw e;
+  }
+}
+
 /**
  * Starts the control server. `window()` returns the BrowserWindow, `call(method, params)` runs a
  * request in it. Returns {port, tokenFile, root, close}.
@@ -66,6 +77,9 @@ function startControl({ port, root, window, call }) {
         const w = window();
         if (!w) throw new Error('ui.screenshot: no window');
         if (params.focus !== false) w.show();
+        // A change made a moment ago is painted on the next frame: wait for it, or the capture is the old one.
+        const painted = w.webContents.executeJavaScript('new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(true))))').catch(() => false);
+        await Promise.race([painted, new Promise((r) => setTimeout(r, 750))]);
         const png = (await w.webContents.capturePage()).toPNG();
         if (params.path) {
           const out = inside(root, params.path, 'ui.screenshot');
@@ -77,7 +91,7 @@ function startControl({ port, root, window, call }) {
       }
       case 'app.open': {
         const file = inside(root, params.path, 'app.open');
-        const bytes = fs.readFileSync(file);
+        const bytes = readFile(file, 'app.open');
         // The path is kept with the document, so a save without one writes back to this file.
         const result = await call('app.openBytes', { name: path.basename(file), base64: bytes.toString('base64'), path: file });
         return { ...(result && typeof result === 'object' ? result : {}), path: file, name: path.basename(file), warnings: [] };
@@ -87,7 +101,7 @@ function startControl({ port, root, window, call }) {
         if (params.command === 'file.placeEmbedded' && params.params && typeof params.params.path === 'string') {
           const { path: rel, ...options } = params.params;
           const file = inside(root, rel, 'doc_place');
-          const result = await call('app.placeBytes', { ...options, name: path.basename(file), base64: fs.readFileSync(file).toString('base64') });
+          const result = await call('app.placeBytes', { ...options, name: path.basename(file), base64: readFile(file, 'doc_place').toString('base64') });
           return { ...(result && typeof result === 'object' ? result : {}), path: file };
         }
         if (params.command === 'file.export.layersToFiles' || params.command === 'file.export.dataSetsAsFiles') {
@@ -95,7 +109,7 @@ function startControl({ port, root, window, call }) {
         }
         if (params.command === 'file.import.variableDataSets' && params.params && typeof params.params.path === 'string') {
           const { path: rel, ...options } = params.params;
-          const text = fs.readFileSync(inside(root, rel, 'doc_import_data_sets'), 'utf8');
+          const text = readFile(inside(root, rel, 'doc_import_data_sets'), 'doc_import_data_sets', 'utf8');
           return call('app.importDataSets', { ...options, text });
         }
         return call(method, params);

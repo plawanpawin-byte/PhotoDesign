@@ -313,30 +313,13 @@ pub struct MenuParams {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct UiSetParams {
-    /// Fields for the control method `ui.set`: tool, panels, dock, dockTabs, dockWidth, colorPanel
-    /// ({background: bool} picks which swatch the Color panel edits), maskTarget,
-    /// vectorMaskTarget, selectionMode, zoom, center, rotation (view angle in degrees), fit, theme (pro, proMedium, studio,
-    /// studioLight, classic, solarizedDark, adwaita, adwaitaDark, breezeLight, breezeDark, softLight, softDark), brushSection, brushTab,
-    /// brushesView, brushPicker ([x, y] opens the Brush Preset picker there, null closes it),
-    /// brushPickerName, brushPickerStroke, brushPickerTip (the picker card's parts, at least one
-    /// on), brushPickerScale (the picker footer's card-scale slider, 0.15 to 2, 1 the standard),
-    /// brushSize, brushHardness, brushOpacity, brushFlow (percent, 0..100), gradientBlendMode
-    /// (a blend mode name, for the Gradient tool), gradientClassic (bool), eyedropperSampleSize
-    /// ("point" or 1, 3, 5, 11, 31, 51, 101), eyedropperSample (current, currentAndBelow, all,
-    /// allNoAdjustments, currentAndBelowNoAdjustments), eyedropperRing (bool), cropOverlay (thirds,
-    /// grid, diagonal, triangle, goldenRatio, goldenSpiral), cropOverlayShow (auto, always, never),
-    /// cropOverlayOrientation (0..3), cropShield (an object patching show_cropped_area, enabled,
-    /// color ("matchCanvas" or "custom"), custom_color ([r, g, b]), opacity (0..100),
-    /// auto_adjust, classic_mode and auto_center_preview), cropFill (background or contentAware,
-    /// the Crop tool's Fill), shapeStroke (an object patching width, align, cap, join, miterLimit,
-    /// dashes, dashOffset and opacity; null disables the stroke). Shape stroke fields use
-    /// `shape.edit` names and units; colour comes from `tools.setColors`. camTransformOnDrop (bool,
-    /// the Content-Aware Move tool's Transform On Drop). tileGrid (bool, a developer overlay of the
-    /// active layer's storage tiles). layerFilter (an object patching by ("kind", "name" or
-    /// "mode"), kinds (a list of layer kinds), name (matches part of the layer name) and mode (a
-    /// blend mode name) for the Layers panel filter). strokeTrace (true, false, "stderr" or "off":
-    /// the stroke latency trace at runtime; a CSV file is set at launch with --stroke-trace, not
-    /// over this channel). Other fields are an error.
+    /// Fields for `ui.set`, all optional, applied together (anything else is an error):
+    /// `tool` (a tool id such as brush, pen, pathSelect, move, crop, type), `zoom` (1 = 100%),
+    /// `fit` (true fits the document in the view), `center` ([x, y] document pixel to centre on),
+    /// `brushSize` (pixels, 1..5000), `brushHardness`, `brushOpacity` and `brushFlow` (percent,
+    /// 0..100, as the options bar shows them: 50 is half), and `selectionMode` (replace, add,
+    /// subtract or intersect; or 0..3 in that order). Example:
+    /// `{"tool":"brush","brushSize":24,"brushOpacity":60}`.
     pub fields: Value,
 }
 

@@ -10,7 +10,7 @@ Layers, masks, adjustments, filters, brushes, type and PSD files in one dark wor
 Every edit is a command, so the interface, the command line and AI agents share one engine.
 Nothing is uploaded: your work stays on your computer.
 
-[![Run from source](https://img.shields.io/badge/Run-from%20source-3b82f6?style=for-the-badge)](#build-and-run)
+[![Download](https://img.shields.io/badge/Download-Windows%20installer-3b82f6?style=for-the-badge)](https://github.com/plawanpawin-byte/PhotoDesign/releases)
 &nbsp;
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-22c55e?style=for-the-badge)](LICENSE-MIT)
 
@@ -44,8 +44,10 @@ Early work on top of the PhotoCraft base. Changes so far are listed in [CHANGES.
 
 ## Tools
 
-<h4>🧰 67 tools</h4>
-Move · Artboard · Rectangular and Elliptical Marquee · Single Row Marquee · Single Column Marquee · Lasso · Polygonal Lasso · Magnetic Lasso · Object Selection · Quick Selection · Magic Wand · Crop · Perspective Crop · Slice · Slice Select · Frame · Eyedropper · Color Sampler · Ruler · Note · Count · Remove · Spot Healing Brush · Healing Brush · Patch · Content-Aware Move · Red Eye · Brush · Pencil · Mixer Brush · Color Replacement · Clone Stamp · Pattern Stamp · History Brush · Eraser · Background Eraser · Magic Eraser · Gradient · Paint Bucket · Blur · Sharpen · Smudge · Dodge · Burn · Sponge · Pen · Freeform Pen · Curvature Pen · Add Anchor Point · Delete Anchor Point · Convert Point · Horizontal and Vertical Type · Horizontal and Vertical Type Mask · Path Selection · Direct Selection · Rectangle · Ellipse · Triangle · Polygon · Line · Custom Shape · Hand · Rotate View · Zoom
+<h4>🧰 40 tools</h4>
+Move · Rectangular Marquee · Elliptical Marquee · Lasso · Magnetic Lasso · Quick Selection · Object Selection · Magic Wand · Crop · Eyedropper · Spot Healing Brush · Healing Brush · Patch · Red Eye · Brush · Pencil · Mixer Brush · Color Replacement · Clone Stamp · Pattern Stamp · History Brush · Eraser · Background Eraser · Magic Eraser · Gradient · Paint Bucket · Blur · Sharpen · Smudge · Dodge · Burn · Sponge · Pen · Direct Selection · Type · Rectangle · Ellipse · Line · Hand · Zoom
+
+Every other engine action (filters, adjustments, slices, artboards and more) is a command: run it from the command finder (Ctrl+K) or from an AI agent.
 
 ## How it is built
 
@@ -64,26 +66,33 @@ engine command, so anything the interface does a script or an AI agent can do to
 
 The egui desktop interface inherited from PhotoCraft was removed; the engine did not depend on it.
 
-## Build and run
+## Install
 
-```
-rustup target add wasm32-unknown-unknown
-cargo install wasm-bindgen-cli --version 0.2.129
+Download `PhotoDesign-Setup-<version>.exe` (installer) or `PhotoDesign-Portable-<version>.exe` (runs
+without installing) from the [Releases page](https://github.com/plawanpawin-byte/PhotoDesign/releases).
+Neither needs Rust or Node.
 
-cd web
-npm install
-npm run engine      # Rust engine to WebAssembly
-npm run build       # the interface, into web/dist
-npm test            # interface tests, including the real engine
+## Connect an AI agent (MCP)
 
-cd ../desktop
-npm install
-npm start           # the window
-```
+PhotoDesign can be driven by Claude Code, Codex, Antigravity and other MCP clients: they open images,
+run any engine command, use the tools on the canvas, and read screenshots. The agent works on the
+window you have open, and files stay inside `Documents\PhotoDesign`.
 
-Engine tests: `cargo test -p photodesign-wasm`, or `cargo test --workspace`. The crates are still
-named `photocraft-*`; renaming them would touch nearly every file. See `docs/development.md` for the
-engine's own build and test notes (it predates the interface change, so skip its egui parts).
+1. Install and start PhotoDesign (the agent talks to the open window).
+2. Run this once in PowerShell. It finds PhotoDesign and adds it to every agent you have installed
+   (Claude Code, Codex, Antigravity), keeping a `.bak` copy of each config it changes:
+
+   ```powershell
+   $exe = Get-ChildItem "$env:LOCALAPPDATA\Programs","$env:ProgramFiles" -Filter "PhotoDesign.exe" -Recurse -EA 0 | Select-Object -First 1 -ExpandProperty FullName; if ($exe) { & $exe --install-mcp } else { "PhotoDesign is not installed: use the installer, or from the source folder run: cd desktop; npm run connect" }
+   ```
+
+3. Restart the agent, then ask it to "list the photodesign tools".
+
+Running from source instead of the installer: `cd desktop`, then `npm install`, `npm run cli` (builds the
+MCP server) and `npm run connect`. If it stops with `EBUSY`, close PhotoDesign and your agent apps
+and run it again. The other ways to connect (Claude Desktop, Cursor, a manual config) and the
+full list of tools are in [`desktop/MCP.md`](desktop/MCP.md). Building the app from source is in
+[`desktop/README.md`](desktop/README.md).
 
 ## Licence
 
