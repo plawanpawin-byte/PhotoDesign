@@ -38,6 +38,28 @@ Nothing is uploaded: your work stays on your computer.
   </tr>
 </table>
 
+## What PhotoDesign is for
+
+PhotoDesign is a desktop photo editor for Windows, built for people who edit photos and graphics
+and want a free tool with no upload and no account. Use it to:
+
+- **Retouch and adjust photos:** levels, curves, colour balance, brightness and contrast.
+- **Work in layers:** raster and shape layers, masks, blend modes, opacity and layer styles.
+- **Draw and paint:** brushes, the pencil and eraser, gradients and the paint bucket.
+- **Make vector shapes and paths:** the Pen tool, Direct Selection and rectangle, ellipse and line tools.
+- **Add text:** horizontal type with Thai and English, with fonts from your computer.
+- **Open and save common formats:** PSD, PNG, JPEG, TIFF and more, so you can keep working on files from other editors.
+- **Automate with an AI agent:** connect Claude Code, Codex or Antigravity to drive the open window (see below).
+
+### Quick start
+
+1. Download the installer from [Releases](https://github.com/plawanpawin-byte/PhotoDesign/releases) and run it.
+2. Press **Ctrl+N** for a new document, or **Ctrl+O** to open a photo.
+3. Pick a tool from the left-hand bar. Press **Ctrl+K** to search for any command by name.
+4. Save with **Ctrl+S**, or export a copy with **Export**.
+
+Every action is also a command in the engine, so anything you can do with the mouse can be scripted.
+
 ## Examples
 
 <p align="center">
