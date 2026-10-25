@@ -38,6 +38,15 @@ Nothing is uploaded: your work stays on your computer.
   </tr>
 </table>
 
+## Examples
+
+<p align="center">
+  <img src="docs/images/example-sunset.png" width="48%" alt="Sunset made in PhotoDesign: gradient sky, sun and hills as shapes" />
+  <img src="docs/images/example-app-window.png" width="48%" alt="The PhotoDesign window with a document open" />
+</p>
+
+The sunset is made only from PhotoDesign's own layers, gradient fill and shapes.
+
 ## Status
 
 Early work on top of the PhotoCraft base. Changes so far are listed in [CHANGES.md](CHANGES.md).
