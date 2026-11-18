@@ -1,4 +1,4 @@
-> **PhotoDesign differences (read first).** This repository started as PhotoCraft 0.15.1. The
+> **Daytime differences (read first).** This repository started as PhotoCraft 0.15.1. The
 > interface is no longer egui: it is TypeScript in `web/`, hosted by Electron in `desktop/`, over the
 > Rust engine compiled to WebAssembly by `apps/photodesign-wasm`. Where the text below says "Rust only",
 > "no Electron" or describes `crates/ui-egui`, `apps/photocraft` or `apps/photocraft-web`, that no longer

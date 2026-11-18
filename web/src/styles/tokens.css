@@ -1,4 +1,4 @@
-/* PhotoDesign design tokens: the Lunatic Design dark palette. */
+/* Daytime design tokens. */
 :root {
   --bg: #161616;          /* menu bar, status bar, seams between docked strips */
   --canvas: #202020;      /* workspace around the image */

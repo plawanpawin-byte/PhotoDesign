@@ -1,0 +1,86 @@
+/* Daytime's macOS look (dark appearance): the system font, a unified toolbar, hairline separators,
+   segmented panel tabs, translucent menus and sheets, accent-blue selection and overlay scrollbars.
+   Loaded after app.css, so it only restyles; layout stays the same. */
+:root {
+  --bg: #2c2c2e;          /* menu bar, toolbar, status bar */
+  --canvas: #1e1e1e;      /* workspace around the image */
+  --card: #252527;        /* sidebars */
+  --card-2: #2c2c2e;      /* panel headers */
+  --field: #1c1c1e;
+  --hover: rgba(255, 255, 255, 0.08);
+  --line: #0f0f10;
+  --line-soft: rgba(255, 255, 255, 0.08);
+  --text: #f2f2f7;
+  --text-dim: #c7c7cc;
+  --text-faint: #8e8e93;
+  --brand: #0a84ff;
+  --brand-hi: #64b0ff;
+  --sel: #0a84ff;
+  --sel-soft: rgba(10, 132, 255, 0.22);
+  --danger: #ff453a;
+  --radius: 10px;
+  --radius-sm: 8px;
+  --radius-xs: 6px;
+  --shadow: 0 14px 36px rgba(0, 0, 0, 0.42), 0 0 0 0.5px rgba(0, 0, 0, 0.5);
+  --mac-seg: rgba(118, 118, 128, 0.24);
+  --mac-seg-on: #636366;
+  --mac-menu: rgba(40, 40, 42, 0.86);
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', 'Segoe UI Variable Text', 'Segoe UI', 'Inter', 'Leelawadee UI', 'Noto Sans Thai', Tahoma, sans-serif;
+  --mono: 'SF Mono', ui-monospace, Menlo, 'Cascadia Code', Consolas, monospace;
+}
+body { letter-spacing: -0.003em; }
+
+/* unified toolbar */
+.menubar-item { font-weight: 500; color: var(--text); }
+.tool-options { background: var(--bg); border-top: 1px solid rgba(255, 255, 255, 0.05); }
+.primary-btn { border-radius: var(--radius-xs); }
+.primary-btn:hover:not(:disabled) { background: var(--brand-hi); }
+.ghost-btn { background: var(--mac-seg); border-color: transparent; color: var(--text); }
+.search-btn { border-radius: var(--radius-xs); background: var(--mac-seg); border-color: transparent; }
+.search-btn:hover { border-color: transparent; color: var(--text-dim); }
+
+/* document tabs as rounded pills */
+.doc-tabbar { background: var(--bg); border-bottom: 1px solid var(--line); padding: 2px 4px; gap: 4px; }
+.doc-tabs { gap: 4px; }
+.doc-tab { border-right: 0; border-radius: var(--radius-xs); }
+.doc-tab:hover { background: var(--hover); }
+.doc-tab.active { background: var(--mac-seg-on); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); }
+
+/* sidebar tool strip */
+.tool { border-radius: 7px; }
+.tool.active { background: var(--sel); color: #fff; }
+.tool.held { background: var(--sel-soft); }
+.tool-fly-item.active { background: var(--sel-soft); box-shadow: none; }
+
+/* panels: segmented tabs on a sidebar */
+.panel-head { background: var(--card); border-bottom: 1px solid var(--line-soft); padding: 3px 4px; height: 30px; }
+.panel-tabs { background: var(--mac-seg); border-radius: 7px; padding: 2px; gap: 2px; }
+.seg { border-right: 0; border-radius: 5px; color: var(--text-dim); font-weight: 500; }
+.seg.active { background: var(--mac-seg-on); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); }
+.layer-list { border-color: var(--line-soft); border-radius: var(--radius-xs); padding: 2px; }
+.layer-row, .history-row { border-radius: 5px; border-bottom: 0; }
+.layer-row:hover, .history-row:hover { background: var(--hover); }
+.layer-row.active, .history-row.active { background: var(--sel); color: #fff; }
+.layer-kind { border-radius: 4px; border-color: transparent; background: rgba(255, 255, 255, 0.1); }
+
+/* fields and sliders */
+input[type='text'], input[type='number'], input:not([type]), select, textarea { border-radius: var(--radius-xs); }
+input:focus, select:focus, textarea:focus { outline: none; box-shadow: 0 0 0 3px var(--sel-soft); }
+input[type='range']::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: var(--mac-seg); }
+input[type='range']::-webkit-slider-thumb { width: 14px; height: 14px; margin-top: -5px; background: #fff; border: 0; box-shadow: 0 0.5px 2px rgba(0, 0, 0, 0.5); }
+.chip, .color-big, .color-small { border-radius: 6px; border-color: rgba(0, 0, 0, 0.6); box-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.25); }
+.swatch { border-radius: 4px; border-color: rgba(0, 0, 0, 0.5); }
+
+/* translucent menus, flyouts, toasts and sheets */
+.menu-list, .export-menu, .tool-fly { background: var(--mac-menu); -webkit-backdrop-filter: blur(24px) saturate(1.6); backdrop-filter: blur(24px) saturate(1.6); border: 0.5px solid rgba(0, 0, 0, 0.6); border-radius: 10px; padding: 5px; }
+.menu-list .menu-item, .tool-fly-item { border-radius: 5px; padding-left: 14px; }
+.menu-sep { margin: 4px 8px; }
+.backdrop { background: rgba(0, 0, 0, 0.3); }
+.dialog, .palette, .toast { background: var(--mac-menu); -webkit-backdrop-filter: blur(30px) saturate(1.6); backdrop-filter: blur(30px) saturate(1.6); border: 0.5px solid rgba(0, 0, 0, 0.6); }
+.dialog { border-radius: 12px; }
+.preset:hover { background: var(--sel-soft); }
+.welcome { background: radial-gradient(1200px 600px at 50% -10%, rgba(10, 132, 255, 0.14), transparent 60%), var(--canvas); }
+
+/* overlay-style scrollbars */
+* { scrollbar-color: rgba(255, 255, 255, 0.28) transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.28); border: 3px solid transparent; border-radius: 10px; background-clip: padding-box; }

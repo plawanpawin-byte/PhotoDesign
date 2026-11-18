@@ -1,5 +1,6 @@
 import './styles/tokens.css';
 import './styles/app.css';
+import './styles/mac.css';
 import { App } from './app';
 import { attachControl } from './control';
 import { loadEngine } from './engine/client';
@@ -151,7 +152,7 @@ async function start() {
     (window as unknown as { photodesign: App }).photodesign = app;
     attachControl(app);
   } catch (e) {
-    root.replaceChildren(h('div.boot-error', h('h1', t('PhotoDesign could not start')), h('p', e instanceof Error ? e.message : String(e)), h('p', t('Build the engine first: npm run engine'))));
+    root.replaceChildren(h('div.boot-error', h('h1', t('Daytime could not start')), h('p', e instanceof Error ? e.message : String(e)), h('p', t('Build the engine first: npm run engine'))));
   }
 }
 

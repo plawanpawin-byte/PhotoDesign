@@ -31,7 +31,7 @@ export const TH: Record<string, string> = {
   'WebP image': 'ภาพ WebP',
   'Photoshop document': 'เอกสาร Photoshop',
   'TIFF image': 'ภาพ TIFF',
-  'PhotoDesign document (.pcraft)': 'เอกสาร PhotoDesign (.pcraft)',
+  'Daytime document (.pcraft)': 'เอกสาร Daytime (.pcraft)',
   // tools
   Brush: 'พู่กัน',
   Eraser: 'ยางลบ',
@@ -199,17 +199,17 @@ export const TH: Record<string, string> = {
   'View': 'มุมมอง',
   'Window': 'หน้าต่าง',
   'Help': 'ช่วยเหลือ',
-  'About PhotoDesign': 'เกี่ยวกับ PhotoDesign',
+  'About Daytime': 'เกี่ยวกับ Daytime',
   'Connect AI agents (MCP)…': 'เชื่อมต่อ AI (MCP)…',
   'Connect AI agents (MCP)': 'เชื่อมต่อ AI (MCP)',
   'Windows: one command (PowerShell)': 'Windows: คำสั่งเดียว (PowerShell)',
   'AI agents connect through MCP and use the same tools as you, in this window. Files they open and save stay in:': 'AI เชื่อมต่อผ่าน MCP และใช้เครื่องมือชุดเดียวกับคุณในหน้าต่างนี้ ไฟล์ที่ AI เปิดและบันทึกจะอยู่ในโฟลเดอร์:',
   'MCP server not built yet. Run in the desktop folder:': 'ยังไม่ได้ build ตัว MCP server ให้รันในโฟลเดอร์ desktop:',
-  'Agents connect to the desktop app. Open PhotoDesign with npm start in the desktop folder, or the installed app.': 'AI เชื่อมต่อได้เฉพาะแอพเดสก์ท็อป เปิด PhotoDesign ด้วย npm start ในโฟลเดอร์ desktop หรือแอพที่ติดตั้งแล้ว',
+  'Agents connect to the desktop app. Open Daytime with npm start in the desktop folder, or the installed app.': 'AI เชื่อมต่อได้เฉพาะแอพเดสก์ท็อป เปิด Daytime ด้วย npm start ในโฟลเดอร์ desktop หรือแอพที่ติดตั้งแล้ว',
   'Copy': 'คัดลอก',
   'Copied': 'คัดลอกแล้ว',
   'Done': 'เสร็จ',
-  'PhotoDesign — free and open source photo editor. Engine in Rust, interface in TypeScript.': 'PhotoDesign — โปรแกรมแต่งภาพฟรีและโอเพนซอร์ส engine เขียนด้วย Rust หน้าตาเขียนด้วย TypeScript',
+  'Daytime — free and open source photo editor. Engine in Rust, interface in TypeScript.': 'Daytime — โปรแกรมแต่งภาพฟรีและโอเพนซอร์ส engine เขียนด้วย Rust หน้าตาเขียนด้วย TypeScript',
   'Drag to resize the panels': 'ลากเพื่อปรับความกว้างของแผง',
   'Levels': 'เลเวล',
   'Black point, midtones, white point': 'จุดดำ โทนกลาง จุดขาว',
@@ -343,9 +343,9 @@ export const TH: Record<string, string> = {
   // status
   ppi: 'ppi',
   // errors
-  'PhotoDesign could not start': 'PhotoDesign เริ่มทำงานไม่ได้',
+  'Daytime could not start': 'Daytime เริ่มทำงานไม่ได้',
   'Build the engine first: npm run engine': 'ต้องสร้างเอนจินก่อน: npm run engine',
-  'Starting PhotoDesign…': 'กำลังเริ่ม PhotoDesign…',
+  'Starting Daytime…': 'กำลังเริ่ม Daytime…',
 };
 
 export function getLang(): Lang {

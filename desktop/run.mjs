@@ -1,4 +1,4 @@
-// One command to open PhotoDesign: brings the Rust engine and the interface up to date with the
+// One command to open Daytime: brings the Rust engine and the interface up to date with the
 // source, then starts the Electron window. Run it with `npm start` in this folder. Both builds are
 // incremental, so after the first run they take seconds.
 import { execFileSync } from 'node:child_process';

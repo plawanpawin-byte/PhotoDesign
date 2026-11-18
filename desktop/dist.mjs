@@ -1,6 +1,6 @@
 // Builds the installable app: the Rust engine (full release optimisation), the interface, the MCP
 // server (bin/photodesign-cli), then the installer for this platform into desktop/release. On
-// Windows that is PhotoDesign-Setup-*.exe and PhotoDesign-Portable-*.exe. Run: npm run dist
+// Windows that is Daytime-Setup-*.exe and Daytime-Portable-*.exe. Run: npm run dist
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';

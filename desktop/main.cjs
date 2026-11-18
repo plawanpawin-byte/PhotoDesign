@@ -1,4 +1,4 @@
-// PhotoDesign's desktop window: serves the TypeScript interface (web/dist, with the Rust engine
+// Daytime's desktop window: serves the TypeScript interface (web/dist, with the Rust engine
 // as WebAssembly) on 127.0.0.1 and shows it. Nothing is reachable from other computers.
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const fs = require('fs');
@@ -6,7 +6,7 @@ const http = require('http');
 const path = require('path');
 const { startControl, loadToken, tokenFile } = require('./control.cjs');
 
-// `PhotoDesign.exe --install-mcp` connects the AI agents installed on this computer, then exits.
+// `Daytime.exe --install-mcp` connects the AI agents installed on this computer, then exits.
 const INSTALL_MODE = process.argv.includes('--install-mcp');
 
 // Installed builds carry the interface in resources/web; from source it is web/dist.
@@ -69,7 +69,7 @@ function startAgents(win) {
     if (e.sender !== win.webContents) return;
     markReady();
     // A reloaded page announces itself again; what the old page was asked is lost with it.
-    for (const p of pending.values()) p.reject(new Error('the PhotoDesign window reloaded; try again'));
+    for (const p of pending.values()) p.reject(new Error('the Daytime window reloaded; try again'));
     pending.clear();
   });
   ipcMain.on('control:reply', (e, { id, ok, result, error }) => {
@@ -82,22 +82,22 @@ function startAgents(win) {
   const call = async (method, params) => {
     let timer;
     const starting = new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error('PhotoDesign is still starting; try again in a moment')), 30_000);
+      timer = setTimeout(() => reject(new Error('Daytime is still starting; try again in a moment')), 30_000);
     });
     await Promise.race([ready, starting]).finally(() => clearTimeout(timer));
-    if (win.isDestroyed()) throw new Error('the PhotoDesign window is closed');
+    if (win.isDestroyed()) throw new Error('the Daytime window is closed');
     return new Promise((resolve, reject) => {
       const id = ++seq;
       pending.set(id, { resolve, reject });
       win.webContents.send('control:call', { id, method, params });
     });
   };
-  const root = path.resolve(process.env.PHOTODESIGN_AUTOMATION_ROOT || path.join(app.getPath('documents'), 'PhotoDesign'));
+  const root = path.resolve(process.env.PHOTODESIGN_AUTOMATION_ROOT || path.join(app.getPath('documents'), 'Daytime'));
   const cli = cliPath();
   const started = startControl({ port: Number(process.env.PHOTODESIGN_CONTROL_PORT || 7878), root, window: () => (win.isDestroyed() ? null : win), call });
   started.then(
-    (c) => console.log(`PhotoDesign control: 127.0.0.1:${c.port}, token file ${c.tokenFile}, files in ${c.root}`),
-    (e) => console.error(`PhotoDesign control channel not started: ${e.message}`),
+    (c) => console.log(`Daytime control: 127.0.0.1:${c.port}, token file ${c.tokenFile}, files in ${c.root}`),
+    (e) => console.error(`Daytime control channel not started: ${e.message}`),
   );
   ipcMain.handle('control:info', async () => {
     const c = await started;
@@ -118,13 +118,13 @@ async function runInstallMcp() {
   };
   // the portable build runs from a temporary copy, so an agent config pointing into it would break on the next start
   if (process.env.PORTABLE_EXECUTABLE_FILE) {
-    log('PhotoDesign: the portable build cannot be connected to agents. Install with PhotoDesign-Setup and run this again.\n');
+    log('Daytime: the portable build cannot be connected to agents. Install with Daytime-Setup and run this again.\n');
     app.exit(1);
     return;
   }
   const cli = cliPath();
   if (!fs.existsSync(cli)) {
-    log(`PhotoDesign: the MCP server was not found at ${cli}. From source, run npm run cli in the desktop folder first.\n`);
+    log(`Daytime: the MCP server was not found at ${cli}. From source, run npm run cli in the desktop folder first.\n`);
     app.exit(1);
     return;
   }
@@ -133,9 +133,9 @@ async function runInstallMcp() {
   const entry = { command: cli, args: ['mcp', '--bridge', `127.0.0.1:${port}`, '--control-token-file', tokenFile] };
   const report = await installMcp({ home: app.getPath('home'), entry });
   const lines = [
-    'PhotoDesign: connecting AI agents',
+    'Daytime: connecting AI agents',
     ...report.map((r) => (r.status === 'written' ? `  ${r.agent}: written to ${r.file}` : r.status === 'skipped' ? `  ${r.agent}: skipped (${r.reason})` : `  ${r.agent}: NOT written (${r.reason}) ${r.file}`)),
-    'Restart Claude Code, Codex or Antigravity, open PhotoDesign, then ask the agent to use the photodesign tools.',
+    'Restart Claude Code, Codex or Antigravity, open Daytime, then ask the agent to use the daytime tools.',
   ];
   log(lines.join('\n') + '\n');
   app.exit(report.some((r) => r.status === 'failed') ? 1 : 0);
@@ -157,7 +157,7 @@ app.whenReady().then(async () => {
     width: 1440,
     height: 900,
     backgroundColor: '#222222',
-    title: 'PhotoDesign',
+    title: 'Daytime',
     autoHideMenuBar: true,
     icon: path.join(__dirname, process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
     webPreferences: { preload: path.join(__dirname, 'preload.cjs') },

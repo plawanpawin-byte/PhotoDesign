@@ -1,6 +1,6 @@
 # AI agents (MCP)
 
-Claude, Codex, Cursor, Antigravity and other MCP clients can drive PhotoDesign: open and save
+Claude, Codex, Cursor, Antigravity and other MCP clients can drive Daytime: open and save
 files, run any of the engine's ~900 commands (every tool, filter, adjustment, layer and selection
 command), paint and select with the tools by pointer events, and see the window.
 
@@ -15,7 +15,7 @@ Two parts:
   `apps/photocraft-cli`). Run with `mcp --bridge 127.0.0.1:7878 --control-token-file <token file>`
   it forwards to the window. Run with just `mcp` it works headless, without the app, on files.
 
-Agents read and write files only inside the automation folder, `Documents/PhotoDesign` (set another
+Agents read and write files only inside the automation folder, `Documents/Daytime` (set another
 with `PHOTODESIGN_AUTOMATION_ROOT`). Paths are relative to it; absolute paths and `..` are refused.
 
 ## Set up
@@ -29,10 +29,10 @@ npm run cli
 
 ### One command (Windows, installed app)
 
-Install `PhotoDesign-Setup`, then run this once in PowerShell and restart Claude Code, Codex or Antigravity:
+Install `Daytime-Setup`, then run this once in PowerShell and restart Claude Code, Codex or Antigravity:
 
 ```
-$exe = Get-ChildItem "$env:LOCALAPPDATA\Programs","$env:ProgramFiles" -Filter "PhotoDesign.exe" -Recurse -EA 0 | Select-Object -First 1 -ExpandProperty FullName; if ($exe) { & $exe --install-mcp } else { "PhotoDesign is not installed: use the installer, or from the source folder run: cd desktop; npm run connect" }
+$exe = Get-ChildItem "$env:LOCALAPPDATA\Programs","$env:ProgramFiles" -Filter "Daytime.exe" -Recurse -EA 0 | Select-Object -First 1 -ExpandProperty FullName; if ($exe) { & $exe --install-mcp } else { "Daytime is not installed: use the installer, or from the source folder run: cd desktop; npm run connect" }
 ```
 
 It adds `photodesign` to each agent's configuration, merging with what is there (other servers stay),
@@ -43,14 +43,14 @@ from a temporary copy); use the installer.
 
 ### By hand
 
-In PhotoDesign open **Help › Connect AI agents (MCP)…**: it shows the exact configuration for
+In Daytime open **Help › Connect AI agents (MCP)…**: it shows the exact configuration for
 your machine, with Copy buttons, for:
 
 - **Claude Desktop, Cursor, Antigravity**: the `mcpServers` JSON block
-- **Claude Code**: `claude mcp add photodesign -- <cli> mcp --bridge 127.0.0.1:7878 --control-token-file <token file>`
-- **Codex**: a `[mcp_servers.photodesign]` block for `~/.codex/config.toml`
+- **Claude Code**: `claude mcp add daytime -- <cli> mcp --bridge 127.0.0.1:7878 --control-token-file <token file>`
+- **Codex**: a `[mcp_servers.daytime]` block for `~/.codex/config.toml`
 
-Keep PhotoDesign open while the agent works.
+Keep Daytime open while the agent works.
 
 ## Tools the agent gets
 
@@ -72,4 +72,4 @@ Keep PhotoDesign open while the agent works.
 | `PHOTODESIGN_CONTROL` | on; `0` turns the channel off |
 | `PHOTODESIGN_CONTROL_PORT` | `7878` |
 | `PHOTODESIGN_CONTROL_TOKEN_FILE` | `~/.photodesign/control.token` |
-| `PHOTODESIGN_AUTOMATION_ROOT` | `Documents/PhotoDesign` |
+| `PHOTODESIGN_AUTOMATION_ROOT` | `Documents/Daytime` |

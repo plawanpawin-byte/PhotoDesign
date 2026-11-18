@@ -25,7 +25,7 @@ export function menuBar(app: App, actions: ChromeActions): HTMLElement {
   const undo = iconButton('undo', t('Undo (Ctrl+Z)'), () => app.undo(), 'small');
   const redo = iconButton('redo', t('Redo (Ctrl+Shift+Z)'), () => app.redo(), 'small');
   const exportMenu = h('div.export-menu', { hidden: true },
-    ...[['png', t('PNG image')], ['jpg', t('JPEG photo')], ['webp', t('WebP image')], ['psd', t('Photoshop document')], ['tif', t('TIFF image')], ['pcraft', t('PhotoDesign document (.pcraft)')]].map(([ext, label]) =>
+    ...[['png', t('PNG image')], ['jpg', t('JPEG photo')], ['webp', t('WebP image')], ['psd', t('Photoshop document')], ['tif', t('TIFF image')], ['pcraft', t('Daytime document (.pcraft)')]].map(([ext, label]) =>
       h('button.menu-item', { onclick: () => { exportMenu.hidden = true; app.exportAs(ext!); } }, h('span', label), h('span.menu-hint', `.${ext}`))),
   );
   const exportBtn = h('button.bar-btn', { onclick: (e: MouseEvent) => { e.stopPropagation(); exportMenu.hidden = !exportMenu.hidden; } }, icon(ICONS.export, 14), t('Export'));
@@ -43,7 +43,7 @@ export function menuBar(app: App, actions: ChromeActions): HTMLElement {
   app.on('state', render);
   render();
   return h('header.menubar',
-    h('div.brand', { title: 'PhotoDesign' }, h('img.brand-logo', { src: './logo-64.png', alt: 'PhotoDesign', width: 18, height: 18 })),
+    h('div.brand', { title: 'Daytime' }, h('img.brand-logo', { src: './logo-64.png', alt: 'Daytime', width: 18, height: 18 })),
     h('nav.menubar-items', { role: 'menubar' }, items),
     h('div.topbar-spacer'),
     search,

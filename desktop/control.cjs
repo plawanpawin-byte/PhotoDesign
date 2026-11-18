@@ -193,7 +193,7 @@ function startControl({ port, root, window, call }) {
         if (req.method === 'auth' && given.length === expected.length && crypto.timingSafeEqual(given, expected)) {
           authed = true;
           clearTimeout(authTimer);
-          send({ id, ok: true, result: { app: 'PhotoDesign' } });
+          send({ id, ok: true, result: { app: 'Daytime' } });
         } else {
           send({ id, ok: false, error: 'authentication failed' });
           socket.end();

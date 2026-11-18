@@ -38,7 +38,7 @@ export function welcome(app: App, openPicker: () => void, openNew: () => void): 
   });
   el.append(
     h('div.welcome-card',
-      h('div.welcome-head', h('img.welcome-logo', { src: './logo-256.png', alt: '', width: 64, height: 64 }), h('div', h('h1', 'Photo', h('b', 'Design')), h('p', t('Edit photos, paint and compose — free and open source.')))),
+      h('div.welcome-head', h('img.welcome-logo', { src: './logo-256.png', alt: '', width: 64, height: 64 }), h('div', h('h1', 'Day', h('b', 'time')), h('p', t('Edit photos, paint and compose — free and open source.')))),
       h('div.welcome-actions',
         h('button.primary-btn.large', { onclick: openPicker }, icon(ICONS.open, 18), t('Open an image')),
         h('button.ghost-btn.large', { onclick: openNew }, icon(ICONS.plus, 18), t('Custom size…'))),
@@ -74,17 +74,17 @@ export interface AgentInfo {
 
 /** One PowerShell line that connects Claude Code, Codex and Antigravity for the installed Windows app. */
 export const INSTALL_COMMAND =
-  '$exe = Get-ChildItem "$env:LOCALAPPDATA\\Programs","$env:ProgramFiles" -Filter "PhotoDesign.exe" -Recurse -EA 0 | Select-Object -First 1 -ExpandProperty FullName; if ($exe) { & $exe --install-mcp } else { "PhotoDesign is not installed: use the installer, or from the source folder run: cd desktop; npm run connect" }';
+  '$exe = Get-ChildItem "$env:LOCALAPPDATA\\Programs","$env:ProgramFiles" -Filter "Daytime.exe" -Recurse -EA 0 | Select-Object -First 1 -ExpandProperty FullName; if ($exe) { & $exe --install-mcp } else { "Daytime is not installed: use the installer, or from the source folder run: cd desktop; npm run connect" }';
 
 /** The MCP server's configuration for AI clients, ready to copy. */
 export function agentConfigs(info: AgentInfo): { name: string; text: string }[] {
   const args = ['mcp', '--bridge', `127.0.0.1:${info.port}`, '--control-token-file', info.tokenFile];
-  const json = JSON.stringify({ mcpServers: { photodesign: { command: info.cli, args } } }, null, 2);
+  const json = JSON.stringify({ mcpServers: { daytime: { command: info.cli, args } } }, null, 2);
   const quote = (s: string) => (/[\s"]/.test(s) ? JSON.stringify(s) : s);
   return [
     { name: 'Claude Desktop / Cursor / Antigravity (JSON)', text: json },
-    { name: 'Claude Code', text: `claude mcp add photodesign -- ${[info.cli, ...args].map(quote).join(' ')}` },
-    { name: 'Codex (~/.codex/config.toml)', text: `[mcp_servers.photodesign]\ncommand = ${JSON.stringify(info.cli)}\nargs = ${JSON.stringify(args)}` },
+    { name: 'Claude Code', text: `claude mcp add daytime -- ${[info.cli, ...args].map(quote).join(' ')}` },
+    { name: 'Codex (~/.codex/config.toml)', text: `[mcp_servers.daytime]\ncommand = ${JSON.stringify(info.cli)}\nargs = ${JSON.stringify(args)}` },
   ];
 }
 
@@ -100,7 +100,7 @@ export function agentsDialog(info: AgentInfo | null, close: () => void): HTMLEle
           return h('div.agent-block', h('div.agent-head', h('b', name), copy), pre);
         }),
       ]
-    : [h('p', t('Agents connect to the desktop app. Open PhotoDesign with npm start in the desktop folder, or the installed app.'))];
+    : [h('p', t('Agents connect to the desktop app. Open Daytime with npm start in the desktop folder, or the installed app.'))];
   return modal(close, h('div.dialog.agents-dialog', h('h2', t('Connect AI agents (MCP)')), ...body, h('div.dialog-actions', h('button.primary-btn', { type: 'button', onclick: close }, t('Done')))));
 }
 
@@ -200,7 +200,7 @@ function clientMenu(app: App, name: string): MenuNode | undefined {
     : name === 'Help' ? [
       item('help.actions', 'Find an action…', () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true })), 'Ctrl+K'),
       item('help.agents', 'Connect AI agents (MCP)…', () => document.dispatchEvent(new CustomEvent('photodesign:agents'))),
-      item('help.about', 'About PhotoDesign', () => app.notify(t('PhotoDesign — free and open source photo editor. Engine in Rust, interface in TypeScript.'))),
+      item('help.about', 'About Daytime', () => app.notify(t('Daytime — free and open source photo editor. Engine in Rust, interface in TypeScript.'))),
     ]
     : null;
   if (!entries) return undefined;

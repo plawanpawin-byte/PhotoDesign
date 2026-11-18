@@ -54,7 +54,7 @@ function object(value: unknown, what: string): Record<string, any> {
 /** The UI state an agent sees: the engine's session and document, plus the tool and view. */
 function inspect(app: App) {
   return {
-    app: 'PhotoDesign',
+    app: 'Daytime',
     tool: app.tools.active,
     tools: TOOLS.map((t) => t.id),
     view: { zoom: app.view.zoom, x: app.view.x, y: app.view.y, viewport: app.viewport },

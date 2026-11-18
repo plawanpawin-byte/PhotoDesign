@@ -1,4 +1,4 @@
-// PhotoDesign's own line icons (24×24, stroked). Drawn for this project.
+// Daytime's own line icons (24×24, stroked). Drawn for this project.
 
 export const ICONS = {
   logo: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v6M18.6 7.6l-5.2 3M18.6 16.4l-5.2-3M12 20.5v-6M5.4 16.4l5.2-3M5.4 7.6l5.2 3"/>',

@@ -2,7 +2,7 @@
   "name": "photodesign-desktop",
   "version": "0.1.0",
   "private": true,
-  "description": "PhotoDesign desktop window (Electron) for the TypeScript interface in web/.",
+  "description": "Daytime desktop window (Electron) for the TypeScript interface in web/.",
   "main": "main.cjs",
   "scripts": {
     "start": "node run.mjs",
@@ -15,10 +15,10 @@
     "electron": "^33.0.0",
     "electron-builder": "^25.1.8"
   },
-  "author": "PhotoDesign",
+  "author": "Daytime",
   "build": {
     "appId": "app.photodesign.desktop",
-    "productName": "PhotoDesign",
+    "productName": "Daytime",
     "directories": {
       "output": "release"
     },
@@ -50,10 +50,10 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "artifactName": "PhotoDesign-Setup-${version}.${ext}"
+      "artifactName": "Daytime-Setup-${version}.${ext}"
     },
     "portable": {
-      "artifactName": "PhotoDesign-Portable-${version}.${ext}"
+      "artifactName": "Daytime-Portable-${version}.${ext}"
     },
     "linux": {
       "icon": "icon.png",

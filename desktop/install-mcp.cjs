@@ -1,10 +1,10 @@
 'use strict';
-// One-command setup: `"PhotoDesign.exe" --install-mcp` adds the MCP server to Claude Code, Codex and Antigravity.
+// One-command setup: `"Daytime.exe" --install-mcp` adds the MCP server to Claude Code, Codex and Antigravity.
 // Each config file is merged, not replaced: other servers and settings stay as they are.
 const fs = require('node:fs/promises');
 const path = require('node:path');
 
-const NAME = 'photodesign';
+const NAME = 'daytime';
 
 /** The config files of each agent, relative to the user's home folder. */
 function targets(home) {
@@ -17,7 +17,7 @@ function targets(home) {
   ];
 }
 
-/** Merge the server into a JSON config: { mcpServers: { photodesign: {command, args, env} } }. */
+/** Merge the server into a JSON config: { mcpServers: { daytime: {command, args, env} } }. */
 function mergeJson(text, entry) {
   let doc = {};
   if (text && text.trim()) {
@@ -35,7 +35,7 @@ function serverJson(entry) {
 
 const tomlString = (s) => `"${String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 
-/** Replace (or add) the [mcp_servers.photodesign] table in a Codex config.toml, leaving every other line alone. */
+/** Replace (or add) the [mcp_servers.daytime] table in a Codex config.toml, leaving every other line alone. */
 function mergeToml(text, entry) {
   const header = `[mcp_servers.${NAME}]`;
   const envHeader = `[mcp_servers.${NAME}.env]`;

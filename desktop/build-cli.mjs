@@ -24,7 +24,7 @@ try {
     renameSync(dest, `${dest}.old`);
     copyFileSync(built, dest);
   } catch (again) {
-    console.error(`Could not replace ${dest} (${again.code ?? again.message}).\nClose PhotoDesign and any agent app that uses it (Codex, Claude Code, Antigravity), then run this again.`);
+    console.error(`Could not replace ${dest} (${again.code ?? again.message}).\nClose Daytime and any agent app that uses it (Codex, Claude Code, Antigravity), then run this again.`);
     process.exit(1);
   }
   console.log('The old MCP server is still running in an open agent app: restart that app to use the new one.');

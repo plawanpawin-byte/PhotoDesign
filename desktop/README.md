@@ -1,6 +1,6 @@
-# PhotoDesign desktop (Electron)
+# Daytime desktop (Electron)
 
-Opens the PhotoDesign interface (`web/`, TypeScript) in its own window. The editing engine is the
+Opens the Daytime interface (`web/`, TypeScript) in its own window. The editing engine is the
 Rust code in `crates/`, compiled to WebAssembly by `apps/photodesign-wasm`.
 
 ```
@@ -28,8 +28,8 @@ cd desktop
 npm run dist
 ```
 
-Builds the engine with full optimisation, the interface, then `release/PhotoDesign-Setup-<version>.exe`
-(installer) and `release/PhotoDesign-Portable-<version>.exe` (runs without installing). The
+Builds the engine with full optimisation, the interface, then `release/Daytime-Setup-<version>.exe`
+(installer) and `release/Daytime-Portable-<version>.exe` (runs without installing). The
 installed app needs neither Rust nor Node.
 
 GitHub builds the same two files on every push (workflow "Desktop app"); download them from the
@@ -39,5 +39,5 @@ run's artifacts. Pushing a `v*` tag also attaches them to a release.
 
 Claude, Codex, Cursor and other MCP clients can drive the open window: every tool, filter and
 command, opening and saving files. On Windows, after installing, run one PowerShell command
-(`PhotoDesign.exe --install-mcp`, see [MCP.md](MCP.md)) to connect Claude Code, Codex and
+(`Daytime.exe --install-mcp`, see [MCP.md](MCP.md)) to connect Claude Code, Codex and
 Antigravity; Help › Connect AI agents (MCP)… shows it with a Copy button. Details: [MCP.md](MCP.md).

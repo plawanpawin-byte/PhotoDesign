@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="assets/photodesign-logo.webp" alt="PhotoDesign logo" width="120" />
+<img src="assets/daytime-logo.webp" alt="Daytime logo" width="120" />
 
-# PhotoDesign
+# Daytime
 
 **A free, open-source photo editor.**
 
@@ -27,20 +27,20 @@ Nothing is uploaded: your work stays on your computer.
     <th>Code</th>
   </tr>
   <tr>
-    <td align="center"><img src="assets/lunaticdesign-logo.png" width="32" alt="lunaticDesign logo" /><br/><b>lunaticDesign</b></td>
+    <td align="center"><img src="assets/timeline-logo.png" width="32" alt="Timeline logo" /><br/><b>Timeline</b></td>
     <td>Vector illustration, photo editing and page layout</td>
     <td><a href="https://github.com/plawanpawin-byte/VectorEdit">GitHub</a></td>
   </tr>
   <tr>
-    <td align="center"><img src="assets/photodesign-logo.webp" width="32" alt="PhotoDesign logo" /><br/><b>PhotoDesign</b> · <b>you are here</b></td>
+    <td align="center"><img src="assets/daytime-logo.webp" width="32" alt="Daytime logo" /><br/><b>Daytime</b> · <b>you are here</b></td>
     <td>Photo editing with layers, adjustments, filters and brushes</td>
     <td><a href="https://github.com/plawanpawin-byte/PhotoDesign">GitHub</a></td>
   </tr>
 </table>
 
-## What PhotoDesign is for
+## What Daytime is for
 
-PhotoDesign is a desktop photo editor for Windows, built for people who edit photos and graphics
+Daytime is a desktop photo editor for Windows, built for people who edit photos and graphics
 and want a free tool with no upload and no account. Use it to:
 
 - **Retouch and adjust photos:** levels, curves, colour balance, brightness and contrast.
@@ -63,11 +63,11 @@ Every action is also a command in the engine, so anything you can do with the mo
 ## Examples
 
 <p align="center">
-  <img src="docs/images/example-sunset.png" width="48%" alt="Sunset made in PhotoDesign: gradient sky, sun and hills as shapes" />
-  <img src="docs/images/example-app-window.png" width="48%" alt="The PhotoDesign window with a document open" />
+  <img src="docs/images/example-sunset.png" width="48%" alt="Sunset made in Daytime: gradient sky, sun and hills as shapes" />
+  <img src="docs/images/example-app-window.png" width="48%" alt="The Daytime window with a document open" />
 </p>
 
-The sunset is made only from PhotoDesign's own layers, gradient fill and shapes.
+The sunset is made only from Daytime's own layers, gradient fill and shapes.
 
 ## Status
 
@@ -90,7 +90,7 @@ Every other engine action (filters, adjustments, slices, artboards and more) is 
 | Bridge from the interface to the engine (WebAssembly) | Rust | [`apps/photodesign-wasm`](apps/photodesign-wasm) |
 | Command line and agent (MCP) server | Rust | `apps/photocraft-cli`, `crates/automation` |
 
-The interface is PhotoDesign's own design, not a copy of Photoshop's: a floating tool capsule, one
+The interface is Daytime's own design, not a copy of Photoshop's: a floating tool capsule, one
 inspector card with Layers / Adjust / Image / History, a command finder (Ctrl+K) over every engine
 action, a start screen with size presets, and a language switch (English, Thai). Every edit is an
 engine command, so anything the interface does a script or an AI agent can do too.
@@ -99,28 +99,28 @@ The egui desktop interface inherited from PhotoCraft was removed; the engine did
 
 ## Install
 
-Download `PhotoDesign-Setup-<version>.exe` (installer) or `PhotoDesign-Portable-<version>.exe` (runs
+Download `Daytime-Setup-<version>.exe` (installer) or `Daytime-Portable-<version>.exe` (runs
 without installing) from the [Releases page](https://github.com/plawanpawin-byte/PhotoDesign/releases).
 Neither needs Rust or Node.
 
 ## Connect an AI agent (MCP)
 
-PhotoDesign can be driven by Claude Code, Codex, Antigravity and other MCP clients: they open images,
+Daytime can be driven by Claude Code, Codex, Antigravity and other MCP clients: they open images,
 run any engine command, use the tools on the canvas, and read screenshots. The agent works on the
-window you have open, and files stay inside `Documents\PhotoDesign`.
+window you have open, and files stay inside `Documents\Daytime`.
 
-1. Install and start PhotoDesign (the agent talks to the open window).
-2. Run this once in PowerShell. It finds PhotoDesign and adds it to every agent you have installed
+1. Install and start Daytime (the agent talks to the open window).
+2. Run this once in PowerShell. It finds Daytime and adds it to every agent you have installed
    (Claude Code, Codex, Antigravity), keeping a `.bak` copy of each config it changes:
 
    ```powershell
-   $exe = Get-ChildItem "$env:LOCALAPPDATA\Programs","$env:ProgramFiles" -Filter "PhotoDesign.exe" -Recurse -EA 0 | Select-Object -First 1 -ExpandProperty FullName; if ($exe) { & $exe --install-mcp } else { "PhotoDesign is not installed: use the installer, or from the source folder run: cd desktop; npm run connect" }
+   $exe = Get-ChildItem "$env:LOCALAPPDATA\Programs","$env:ProgramFiles" -Filter "Daytime.exe" -Recurse -EA 0 | Select-Object -First 1 -ExpandProperty FullName; if ($exe) { & $exe --install-mcp } else { "Daytime is not installed: use the installer, or from the source folder run: cd desktop; npm run connect" }
    ```
 
-3. Restart the agent, then ask it to "list the photodesign tools".
+3. Restart the agent, then ask it to "list the daytime tools".
 
 Running from source instead of the installer: `cd desktop`, then `npm install`, `npm run cli` (builds the
-MCP server) and `npm run connect`. If it stops with `EBUSY`, close PhotoDesign and your agent apps
+MCP server) and `npm run connect`. If it stops with `EBUSY`, close Daytime and your agent apps
 and run it again. The other ways to connect (Claude Desktop, Cursor, a manual config) and the
 full list of tools are in [`desktop/MCP.md`](desktop/MCP.md). Building the app from source is in
 [`desktop/README.md`](desktop/README.md).
@@ -132,4 +132,4 @@ in `NOTICE` and `ATTRIBUTION.md`.
 
 ### Language share
 
-`node scripts/lang-share.mjs` counts only the code written for PhotoDesign (the `web/` interface, the `desktop/` host and the `photodesign-wasm` bridge), not the PhotoCraft engine in `crates/`. The engine is about 19 MB of Rust and is reused as it is.
+`node scripts/lang-share.mjs` counts only the code written for Daytime (the `web/` interface, the `desktop/` host and the `photodesign-wasm` bridge), not the PhotoCraft engine in `crates/`. The engine is about 19 MB of Rust and is reused as it is.
